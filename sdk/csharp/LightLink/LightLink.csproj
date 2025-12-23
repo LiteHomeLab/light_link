@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>0.1.0</Version>
+    <Authors>LiteHomeLab</Authors>
+    <Description>LightLink SDK for C# - Multi-language backend service communication framework based on NATS</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NATS.Client" Version="1.1.0" />
+    <PackageReference Include="NATS.Client.Serializers.Json" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>

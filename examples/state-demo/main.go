@@ -2,31 +2,54 @@ package main
 
 import (
     "fmt"
+    "log"
     "time"
 
     "github.com/LiteHomeLab/light_link/sdk/go/client"
+    "github.com/LiteHomeLab/light_link/examples"
 )
 
 func main() {
-    cli, _ := client.NewClient("nats://localhost:4222", nil)
+    config := examples.GetConfig()
+
+    fmt.Println("=== State Management Demo ===")
+    fmt.Println("NATS URL:", config.NATSURL)
+
+    cli, err := client.NewClient(config.NATSURL, nil)
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
     defer cli.Close()
 
-    // Watch state changes
-    stop, _ := cli.WatchState("device.sensor01", func(state map[string]interface{}) {
+    fmt.Println("\n[1/3] Watching state changes for device.sensor01...")
+    stop, err := cli.WatchState("device.sensor01", func(state map[string]interface{}) {
         fmt.Printf("State updated: %v\n", state)
     })
+    if err != nil {
+        log.Fatalf("Failed to watch state: %v", err)
+    }
     defer stop()
 
-    // Update state
+    fmt.Println("\n[2/3] Updating state 3 times...")
     for i := 0; i < 3; i++ {
-        cli.SetState("device.sensor01", map[string]interface{}{
+        err := cli.SetState("device.sensor01", map[string]interface{}{
             "temperature": 20.0 + float64(i),
             "humidity":    50 + i,
+            "timestamp":   time.Now().Unix(),
         })
+        if err != nil {
+            fmt.Printf("Failed to set state: %v\n", err)
+        }
         time.Sleep(500 * time.Millisecond)
     }
 
-    // Get latest state
-    state, _ := cli.GetState("device.sensor01")
-    fmt.Printf("Latest state: %v\n", state)
+    fmt.Println("\n[3/3] Getting latest state...")
+    state, err := cli.GetState("device.sensor01")
+    if err != nil {
+        fmt.Printf("Failed to get state: %v\n", err)
+    } else {
+        fmt.Printf("Latest state: %v\n", state)
+    }
+
+    fmt.Println("\n=== State Management Demo Complete ===")
 }

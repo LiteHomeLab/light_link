@@ -69,9 +69,16 @@ func (c *Client) WatchState(key string, handler func(map[string]interface{})) (f
         return nil, err
     }
 
+    // Get or create KV bucket
     kv, err := js.KeyValue(context.Background(), "light_link_state")
     if err != nil {
-        return nil, err
+        // Create bucket
+        kv, err = js.CreateKeyValue(context.Background(), jetstream.KeyValueConfig{
+            Bucket: "light_link_state",
+        })
+        if err != nil {
+            return nil, err
+        }
     }
 
     watcher, err := kv.Watch(context.Background(), key, jetstream.IgnoreDeletes())
