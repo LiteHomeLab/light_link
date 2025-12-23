@@ -2,7 +2,9 @@ package client
 
 import (
 	"encoding/base64"
+	"fmt"
 
+	"github.com/LiteHomeLab/light_link/sdk/go/backup"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
@@ -159,4 +161,260 @@ func (c *Client) CleanupOldVersions(serviceName, backupName string) error {
 
 	_, err := c.Call("backup-agent", "backup.cleanup", args)
 	return err
+}
+
+// ChunkedUploadHandle represents an ongoing chunked upload
+type ChunkedUploadHandle struct {
+	client      *Client
+	transferID  string
+	totalChunks int
+	splitter    *ChunkSplitter
+}
+
+// ChunkSplitter wraps the backup.ChunkSplitter for client use
+type ChunkSplitter struct {
+	splitter *backup.ChunkSplitter
+}
+
+// NewChunkSplitter creates a new chunk splitter
+func NewChunkSplitter(data []byte) *ChunkSplitter {
+	return &ChunkSplitter{
+		splitter: backup.NewChunkSplitter(data),
+	}
+}
+
+// SetFileID sets the file ID for the transfer
+func (cs *ChunkSplitter) SetFileID(id string) {
+	cs.splitter.SetFileID(id)
+}
+
+// SetChunkSize sets custom chunk size
+func (cs *ChunkSplitter) SetChunkSize(size int) {
+	cs.splitter.SetChunkSize(size)
+}
+
+// Metadata returns the chunk metadata
+func (cs *ChunkSplitter) Metadata() backup.ChunkMetadata {
+	return cs.splitter.Metadata()
+}
+
+// SplitAll splits all data into chunks
+func (cs *ChunkSplitter) SplitAll() ([]backup.Chunk, error) {
+	return cs.splitter.SplitAll()
+}
+
+// UploadChunked starts a chunked upload
+func (c *Client) UploadChunked(serviceName, backupName string, data []byte) (*ChunkedUploadHandle, error) {
+	splitter := NewChunkSplitter(data)
+
+	metadata := splitter.Metadata()
+	metadataBytes, err := backup.SerializeMetadata(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("serialize metadata: %w", err)
+	}
+
+	args := map[string]interface{}{
+		"service_name": serviceName,
+		"backup_name":  backupName,
+		"metadata":     base64.StdEncoding.EncodeToString(metadataBytes),
+	}
+
+	result, err := c.Call("backup-agent", "backup.upload_init", args)
+	if err != nil {
+		return nil, err
+	}
+
+	transferID, ok := result["transfer_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid transfer_id response")
+	}
+
+	totalChunksFloat, ok := result["total_chunks"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid total_chunks response")
+	}
+
+	return &ChunkedUploadHandle{
+		client:      c,
+		transferID:  transferID,
+		totalChunks: int(totalChunksFloat),
+		splitter:    splitter,
+	}, nil
+}
+
+// UploadNextChunk uploads the next chunk
+func (h *ChunkedUploadHandle) UploadNextChunk(chunk backup.Chunk) error {
+	chunkBytes, err := backup.SerializeChunk(chunk)
+	if err != nil {
+		return fmt.Errorf("serialize chunk: %w", err)
+	}
+
+	args := map[string]interface{}{
+		"transfer_id": h.transferID,
+		"chunk":       base64.StdEncoding.EncodeToString(chunkBytes),
+	}
+
+	_, err = h.client.Call("backup-agent", "backup.upload_chunk", args)
+	return err
+}
+
+// UploadAll uploads all chunks
+func (h *ChunkedUploadHandle) UploadAll() error {
+	chunks, err := h.splitter.SplitAll()
+	if err != nil {
+		return fmt.Errorf("split chunks: %w", err)
+	}
+
+	for _, chunk := range chunks {
+		if err := h.UploadNextChunk(chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Complete completes the chunked upload
+func (h *ChunkedUploadHandle) Complete() (int, error) {
+	args := map[string]interface{}{
+		"transfer_id": h.transferID,
+	}
+
+	result, err := h.client.Call("backup-agent", "backup.upload_complete", args)
+	if err != nil {
+		return 0, err
+	}
+
+	versionFloat, ok := result["version"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid version response")
+	}
+
+	return int(versionFloat), nil
+}
+
+// UploadChunkedComplete uploads data in chunks and completes the transfer
+func (c *Client) UploadChunkedComplete(serviceName, backupName string, data []byte) (int, error) {
+	handle, err := c.UploadChunked(serviceName, backupName, data)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := handle.UploadAll(); err != nil {
+		return 0, err
+	}
+
+	return handle.Complete()
+}
+
+// ChunkedDownloadHandle represents an ongoing chunked download
+type ChunkedDownloadHandle struct {
+	client      *Client
+	transferID  string
+	totalChunks int
+	metadata    backup.ChunkMetadata
+}
+
+// DownloadChunked starts a chunked download
+func (c *Client) DownloadChunked(serviceName, backupName string, version int) (*ChunkedDownloadHandle, error) {
+	args := map[string]interface{}{
+		"service_name": serviceName,
+		"backup_name":  backupName,
+		"version":      float64(version),
+	}
+
+	result, err := c.Call("backup-agent", "backup.download_init", args)
+	if err != nil {
+		return nil, err
+	}
+
+	transferID, ok := result["transfer_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid transfer_id response")
+	}
+
+	totalChunksFloat, ok := result["total_chunks"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid total_chunks response")
+	}
+
+	metadataBase64, ok := result["metadata"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid metadata response")
+	}
+
+	metadataBytes, err := base64.StdEncoding.DecodeString(metadataBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode metadata: %w", err)
+	}
+
+	metadata, err := backup.DeserializeMetadata(metadataBytes)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize metadata: %w", err)
+	}
+
+	return &ChunkedDownloadHandle{
+		client:      c,
+		transferID:  transferID,
+		totalChunks: int(totalChunksFloat),
+		metadata:    metadata,
+	}, nil
+}
+
+// DownloadChunk downloads a specific chunk
+func (h *ChunkedDownloadHandle) DownloadChunk(chunkIndex int) (*backup.Chunk, error) {
+	args := map[string]interface{}{
+		"transfer_id":  h.transferID,
+		"chunk_index":  float64(chunkIndex),
+	}
+
+	result, err := h.client.Call("backup-agent", "backup.download_chunk", args)
+	if err != nil {
+		return nil, err
+	}
+
+	chunkBase64, ok := result["chunk"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid chunk response")
+	}
+
+	chunkBytes, err := base64.StdEncoding.DecodeString(chunkBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode chunk: %w", err)
+	}
+
+	chunk, err := backup.DeserializeChunk(chunkBytes)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize chunk: %w", err)
+	}
+
+	return &chunk, nil
+}
+
+// DownloadAll downloads all chunks and assembles the data
+func (h *ChunkedDownloadHandle) DownloadAll() ([]byte, error) {
+	assembler := backup.NewChunkAssembler(h.metadata)
+
+	for i := 0; i < int(h.metadata.TotalChunks); i++ {
+		chunk, err := h.DownloadChunk(i)
+		if err != nil {
+			return nil, fmt.Errorf("download chunk %d: %w", i, err)
+		}
+
+		if err := assembler.AddChunk(*chunk); err != nil {
+			return nil, fmt.Errorf("add chunk %d: %w", i, err)
+		}
+	}
+
+	return assembler.Assemble()
+}
+
+// DownloadChunkedComplete downloads a backup in chunks and returns the data
+func (c *Client) DownloadChunkedComplete(serviceName, backupName string, version int) ([]byte, error) {
+	handle, err := c.DownloadChunked(serviceName, backupName, version)
+	if err != nil {
+		return nil, err
+	}
+
+	return handle.DownloadAll()
 }

@@ -19,8 +19,22 @@ import (
 // BackupService manages backup storage and retrieval
 type BackupService struct {
 	*Service
-	storagePath string
-	mu          sync.RWMutex
+	storagePath    string
+	mu             sync.RWMutex
+	uploads        map[string]*chunkUploadState  // transfer_id -> upload state
+	downloads      map[string]*backup.ChunkMetadata // transfer_id -> download metadata
+	uploadMu       sync.RWMutex
+	downloadMu     sync.RWMutex
+}
+
+// chunkUploadState tracks an ongoing chunked upload
+type chunkUploadState struct {
+	serviceName  string
+	backupName   string
+	maxVersions  int
+	assembler    *backup.ChunkAssembler
+	tempFile     string
+	createdAt    time.Time
 }
 
 // NewBackupService creates a new backup service
@@ -40,8 +54,10 @@ func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storage
 	}
 
 	bs := &BackupService{
-		Service:    svc,
+		Service:     svc,
 		storagePath: storagePath,
+		uploads:     make(map[string]*chunkUploadState),
+		downloads:   make(map[string]*backup.ChunkMetadata),
 	}
 
 	// Register RPC handlers
@@ -66,6 +82,26 @@ func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storage
 		return nil, err
 	}
 	if err := bs.RegisterRPC("backup.cleanup", bs.handleCleanup); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.upload_init", bs.handleUploadInit); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.upload_chunk", bs.handleUploadChunk); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.upload_complete", bs.handleUploadComplete); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.download_init", bs.handleDownloadInit); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.download_chunk", bs.handleDownloadChunk); err != nil {
 		svc.Stop()
 		return nil, err
 	}
@@ -606,3 +642,347 @@ func (s *BackupService) cleanupOldVersionsLocked(metadata *types.BackupMetadata)
 	return cleaned
 }
 
+// handleUploadInit initializes a chunked upload
+func (s *BackupService) handleUploadInit(args map[string]interface{}) (map[string]interface{}, error) {
+	serviceName, ok := args["service_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing service_name")
+	}
+
+	backupName, ok := args["backup_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing backup_name")
+	}
+
+	// Get max_versions parameter
+	maxVersions := 0
+	if mv, ok := args["max_versions"].(float64); ok {
+		maxVersions = int(mv)
+	}
+
+	// Get metadata
+	metadataBase64, ok := args["metadata"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing metadata")
+	}
+
+	metadataBytes, err := base64.StdEncoding.DecodeString(metadataBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode metadata: %w", err)
+	}
+
+	metadata, err := backup.DeserializeMetadata(metadataBytes)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize metadata: %w", err)
+	}
+
+	// Generate transfer ID
+	transferID := fmt.Sprintf("%s.%s.%d", serviceName, backupName, time.Now().UnixNano())
+
+	// Create temp file for chunks
+	tempDir := filepath.Join(s.storagePath, "temp")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+	tempFile := filepath.Join(tempDir, transferID+".tmp")
+
+	// Create upload state
+	state := &chunkUploadState{
+		serviceName: serviceName,
+		backupName:  backupName,
+		maxVersions: maxVersions,
+		assembler:   backup.NewChunkAssembler(metadata),
+		tempFile:    tempFile,
+		createdAt:   time.Now(),
+	}
+
+	s.uploadMu.Lock()
+	s.uploads[transferID] = state
+	s.uploadMu.Unlock()
+
+	return map[string]interface{}{
+		"transfer_id": transferID,
+		"total_chunks": float64(metadata.TotalChunks),
+		"total_size":   float64(metadata.TotalSize),
+	}, nil
+}
+
+// handleUploadChunk handles a chunk upload
+func (s *BackupService) handleUploadChunk(args map[string]interface{}) (map[string]interface{}, error) {
+	transferID, ok := args["transfer_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing transfer_id")
+	}
+
+	chunkBase64, ok := args["chunk"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing chunk")
+	}
+
+	chunkBytes, err := base64.StdEncoding.DecodeString(chunkBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode chunk: %w", err)
+	}
+
+	chunk, err := backup.DeserializeChunk(chunkBytes)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize chunk: %w", err)
+	}
+
+	s.uploadMu.Lock()
+	state, ok := s.uploads[transferID]
+	s.uploadMu.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("upload not found: %s", transferID)
+	}
+
+	if err := state.assembler.AddChunk(chunk); err != nil {
+		return nil, fmt.Errorf("add chunk: %w", err)
+	}
+
+	missing := state.assembler.MissingChunks()
+	return map[string]interface{}{
+		"chunk_index": float64(chunk.Index),
+		"received":    float64(len(missing)),
+		"complete":    state.assembler.IsComplete(),
+	}, nil
+}
+
+// handleUploadComplete completes a chunked upload
+func (s *BackupService) handleUploadComplete(args map[string]interface{}) (map[string]interface{}, error) {
+	transferID, ok := args["transfer_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing transfer_id")
+	}
+
+	s.uploadMu.Lock()
+	state, ok := s.uploads[transferID]
+	if ok {
+		delete(s.uploads, transferID)
+	}
+	s.uploadMu.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("upload not found: %s", transferID)
+	}
+
+	// Assemble all chunks
+	data, err := state.assembler.Assemble()
+	if err != nil {
+		return nil, fmt.Errorf("assemble: %w", err)
+	}
+
+	// Clean up temp file
+	os.Remove(state.tempFile)
+
+	// Create the backup using the assembled data
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Load current metadata
+	metadata, err := s.loadMetadata(state.serviceName, state.backupName)
+	if err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
+	// Update max_versions if provided
+	if state.maxVersions > 0 {
+		metadata.MaxVersions = state.maxVersions
+	}
+
+	// Increment version
+	metadata.CurrentVersion++
+	version := metadata.CurrentVersion
+
+	// Calculate checksum
+	hash := sha256.Sum256(data)
+	checksum := hex.EncodeToString(hash[:])
+
+	// Create version info
+	versionInfo := types.BackupVersion{
+		Version:   version,
+		Type:      "full",
+		FileSize:  int64(len(data)),
+		Checksum:  checksum,
+		CreatedAt: time.Now(),
+	}
+
+	// Save data to file
+	versionPath := s.getVersionPath(state.serviceName, state.backupName, version)
+	versionDir := filepath.Dir(versionPath)
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		return nil, fmt.Errorf("create backup dir: %w", err)
+	}
+	if err := os.WriteFile(versionPath, data, 0644); err != nil {
+		return nil, fmt.Errorf("write version file: %w", err)
+	}
+
+	// Update metadata
+	metadata.Versions = append(metadata.Versions, versionInfo)
+
+	// Save metadata
+	if err := s.saveMetadata(metadata); err != nil {
+		os.Remove(versionPath)
+		return nil, fmt.Errorf("save metadata: %w", err)
+	}
+
+	// Auto cleanup if max_versions is set
+	cleanupCount := 0
+	if metadata.MaxVersions > 0 && len(metadata.Versions) > metadata.MaxVersions {
+		cleanupCount = s.cleanupOldVersionsLocked(metadata)
+		if err := s.saveMetadata(metadata); err != nil {
+			fmt.Printf("Warning: failed to save metadata after cleanup: %v\n", err)
+		}
+	}
+
+	result := map[string]interface{}{
+		"version":  float64(version),
+		"size":     versionInfo.FileSize,
+		"checksum": checksum,
+	}
+
+	if cleanupCount > 0 {
+		result["cleaned"] = cleanupCount
+	}
+
+	return result, nil
+}
+
+// handleDownloadInit initializes a chunked download
+func (s *BackupService) handleDownloadInit(args map[string]interface{}) (map[string]interface{}, error) {
+	serviceName, ok := args["service_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing service_name")
+	}
+
+	backupName, ok := args["backup_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing backup_name")
+	}
+
+	versionFloat, ok := args["version"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("missing version")
+	}
+	version := int(versionFloat)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	metadata, err := s.loadMetadata(serviceName, backupName)
+	if err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
+	// Check if version exists
+	if version < 1 || version > metadata.CurrentVersion {
+		return nil, fmt.Errorf("version %d not found (current: %d)", version, metadata.CurrentVersion)
+	}
+
+	// Read version file
+	versionPath := s.getVersionPath(serviceName, backupName, version)
+	data, err := os.ReadFile(versionPath)
+	if err != nil {
+		return nil, fmt.Errorf("read version file: %w", err)
+	}
+
+	// Generate transfer ID
+	transferID := fmt.Sprintf("%s.%s.v%d.%d", serviceName, backupName, version, time.Now().UnixNano())
+
+	// Create chunk metadata
+	chunkMetadata := backup.ChunkMetadata{
+		TotalChunks: uint32((len(data) + backup.ChunkSize - 1) / backup.ChunkSize),
+		TotalSize:   uint64(len(data)),
+		FileID:      transferID,
+		Checksum:    backup.CalculateChecksum(data),
+	}
+
+	// Store download state
+	s.downloadMu.Lock()
+	s.downloads[transferID] = &chunkMetadata
+	s.downloadMu.Unlock()
+
+	// Serialize metadata for response
+	metadataBytes, err := backup.SerializeMetadata(chunkMetadata)
+	if err != nil {
+		return nil, fmt.Errorf("serialize metadata: %w", err)
+	}
+
+	// Store data in a temp location for chunk retrieval
+	tempDir := filepath.Join(s.storagePath, "temp")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+	tempFile := filepath.Join(tempDir, transferID+".tmp")
+	if err := os.WriteFile(tempFile, data, 0644); err != nil {
+		return nil, fmt.Errorf("write temp file: %w", err)
+	}
+
+	return map[string]interface{}{
+		"transfer_id":  transferID,
+		"total_chunks": float64(chunkMetadata.TotalChunks),
+		"total_size":   float64(chunkMetadata.TotalSize),
+		"metadata":     base64.StdEncoding.EncodeToString(metadataBytes),
+	}, nil
+}
+
+// handleDownloadChunk handles a chunk download request
+func (s *BackupService) handleDownloadChunk(args map[string]interface{}) (map[string]interface{}, error) {
+	transferID, ok := args["transfer_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing transfer_id")
+	}
+
+	chunkIndexFloat, ok := args["chunk_index"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("missing chunk_index")
+	}
+	chunkIndex := uint32(chunkIndexFloat)
+
+	s.downloadMu.Lock()
+	_, ok = s.downloads[transferID]
+	s.downloadMu.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("download not found: %s", transferID)
+	}
+
+	// Read the temp file
+	tempFile := filepath.Join(s.storagePath, "temp", transferID+".tmp")
+	data, err := os.ReadFile(tempFile)
+	if err != nil {
+		return nil, fmt.Errorf("read temp file: %w", err)
+	}
+
+	// Extract the requested chunk
+	start := int(chunkIndex) * backup.ChunkSize
+	end := start + backup.ChunkSize
+	if end > len(data) {
+		end = len(data)
+	}
+
+	if start >= len(data) {
+		return nil, fmt.Errorf("chunk index out of range")
+	}
+
+	chunkData := data[start:end]
+	chunk := backup.Chunk{
+		Index:    chunkIndex,
+		Data:     chunkData,
+		Checksum: backup.CalculateChecksum(chunkData),
+		Size:     uint32(len(chunkData)),
+	}
+
+	// Serialize chunk
+	chunkBytes, err := backup.SerializeChunk(chunk)
+	if err != nil {
+		return nil, fmt.Errorf("serialize chunk: %w", err)
+	}
+
+	return map[string]interface{}{
+		"chunk": base64.StdEncoding.EncodeToString(chunkBytes),
+		"index": float64(chunk.Index),
+		"size":  float64(chunk.Size),
+	}, nil
+}
