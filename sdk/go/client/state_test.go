@@ -1,0 +1,62 @@
+package client
+
+import (
+    "testing"
+    "time"
+)
+
+func TestSetGetState(t *testing.T) {
+    client, err := NewClient("nats://localhost:4222", nil)
+    if err != nil {
+        t.Skip("Need running NATS server with JetStream:", err)
+    }
+    defer client.Close()
+
+    // Set state
+    err = client.SetState("test.key", map[string]interface{}{"value": 123})
+    if err != nil {
+        t.Fatalf("SetState failed: %v", err)
+    }
+
+    // Get state
+    state, err := client.GetState("test.key")
+    if err != nil {
+        t.Fatalf("GetState failed: %v", err)
+    }
+
+    if state["value"].(float64) != 123 {
+        t.Errorf("Expected 123, got %v", state["value"])
+    }
+}
+
+func TestWatchState(t *testing.T) {
+    client, err := NewClient("nats://localhost:4222", nil)
+    if err != nil {
+        t.Skip("Need running NATS server with JetStream:", err)
+    }
+    defer client.Close()
+
+    changes := make(chan map[string]interface{}, 1)
+
+    // Watch state changes
+    stop, err := client.WatchState("test.watch", func(state map[string]interface{}) {
+        changes <- state
+    })
+    if err != nil {
+        t.Fatalf("WatchState failed: %v", err)
+    }
+    defer stop()
+
+    // Modify state
+    client.SetState("test.watch", map[string]interface{}{"status": "updated"})
+
+    // Wait for notification
+    select {
+    case state := <-changes:
+        if state["status"] != "updated" {
+            t.Errorf("Expected 'updated', got '%v'", state["status"])
+        }
+    case <-time.After(2 * time.Second):
+        t.Error("Timeout waiting for state change")
+    }
+}
