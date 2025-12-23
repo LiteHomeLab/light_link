@@ -85,7 +85,7 @@ func (s *Service) handleRPC(msg *nats.Msg) {
     // Parse request
     var request types.RPCRequest
     if err := json.Unmarshal(msg.Data, &request); err != nil {
-        s.sendError(msg, "invalid request: "+err.Error())
+        s.sendError(msg, "", "invalid request: "+err.Error())
         return
     }
 
@@ -95,14 +95,14 @@ func (s *Service) handleRPC(msg *nats.Msg) {
     s.rpcMutex.RUnlock()
 
     if !exists {
-        s.sendError(msg, "method not found: "+request.Method)
+        s.sendError(msg, request.ID, "method not found: "+request.Method)
         return
     }
 
     // Call handler
     result, err := handler(request.Args)
     if err != nil {
-        s.sendError(msg, err.Error())
+        s.sendError(msg, request.ID, err.Error())
         return
     }
 
@@ -118,9 +118,9 @@ func (s *Service) handleRPC(msg *nats.Msg) {
 }
 
 // sendError sends an error response
-func (s *Service) sendError(msg *nats.Msg, errMsg string) {
+func (s *Service) sendError(msg *nats.Msg, requestID, errMsg string) {
     response := types.RPCResponse{
-        ID:      "",
+        ID:      requestID,
         Success: false,
         Error:   errMsg,
     }
