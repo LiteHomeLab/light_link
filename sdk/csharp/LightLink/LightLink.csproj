@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="NATS.Client" Version="1.1.0" />
-    <PackageReference Include="NATS.Client.Serializers.Json" Version="1.1.0" />
+    <PackageReference Include="System.Text.Json" Version="7.0.0" />
   </ItemGroup>
 
 </Project>

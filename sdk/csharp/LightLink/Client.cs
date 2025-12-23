@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using NATS.Client;
@@ -93,8 +94,8 @@ namespace LightLink
         /// <param name="args">Arguments dictionary</param>
         /// <param name="timeoutMs">Timeout in milliseconds (default: 5000)</param>
         /// <returns>Result dictionary</returns>
-        public Dictionary<string, string> Call(string service, string method,
-            Dictionary<string, string> args, int timeoutMs = 5000)
+        public Dictionary<string, JsonElement> Call(string service, string method,
+            Dictionary<string, object> args, int timeoutMs = 5000)
         {
             string subject = $"$SRV.{service}.{method}";
 
@@ -105,7 +106,7 @@ namespace LightLink
                 Args = args
             };
 
-            string requestJson = JsonHelper.Serialize(request);
+            string requestJson = JsonSerializer.Serialize(request);
             byte[] requestData = System.Text.Encoding.UTF8.GetBytes(requestJson);
 
             try
@@ -113,7 +114,7 @@ namespace LightLink
                 Msg msg = _nc.Request(subject, requestData, timeoutMs);
                 string responseJson = System.Text.Encoding.UTF8.GetString(msg.Data);
 
-                var response = JsonHelper.Deserialize<RPCResponse>(responseJson);
+                var response = JsonSerializer.Deserialize<RPCResponse>(responseJson);
                 if (!response.Success)
                 {
                     throw new Exception(response.Error);
@@ -135,8 +136,8 @@ namespace LightLink
         /// <param name="args">Arguments dictionary</param>
         /// <param name="timeoutMs">Timeout in milliseconds (default: 5000)</param>
         /// <returns>Result dictionary</returns>
-        public async Task<Dictionary<string, string>> CallAsync(string service, string method,
-            Dictionary<string, string> args, int timeoutMs = 5000)
+        public async Task<Dictionary<string, JsonElement>> CallAsync(string service, string method,
+            Dictionary<string, object> args, int timeoutMs = 5000)
         {
             return await Task.Run(() => Call(service, method, args, timeoutMs));
         }
@@ -146,9 +147,9 @@ namespace LightLink
         /// </summary>
         /// <param name="subject">Subject to publish to</param>
         /// <param name="data">Data dictionary</param>
-        public void Publish(string subject, Dictionary<string, string> data)
+        public void Publish(string subject, Dictionary<string, object> data)
         {
-            string json = JsonHelper.Serialize(data);
+            string json = JsonSerializer.Serialize(data);
             byte[] msgData = System.Text.Encoding.UTF8.GetBytes(json);
             _nc.Publish(subject, msgData);
         }
@@ -158,7 +159,7 @@ namespace LightLink
         /// </summary>
         /// <param name="subject">Subject to publish to</param>
         /// <param name="data">Data dictionary</param>
-        public async Task PublishAsync(string subject, Dictionary<string, string> data)
+        public async Task PublishAsync(string subject, Dictionary<string, object> data)
         {
             await Task.Run(() => Publish(subject, data));
         }
@@ -169,12 +170,12 @@ namespace LightLink
         /// <param name="subject">Subject to subscribe to</param>
         /// <param name="handler">Message handler callback</param>
         /// <returns>Subscription object</returns>
-        public ISubscription Subscribe(string subject, Action<Dictionary<string, string>> handler)
+        public ISubscription Subscribe(string subject, Action<Dictionary<string, JsonElement>> handler)
         {
             return _nc.SubscribeAsync(subject, (msg) =>
             {
                 string json = System.Text.Encoding.UTF8.GetString(msg.Data);
-                var data = JsonHelper.Deserialize<Dictionary<string, string>>(json);
+                var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
                 handler(data);
             });
         }
@@ -184,10 +185,10 @@ namespace LightLink
         /// </summary>
         /// <param name="key">State key</param>
         /// <param name="value">State value dictionary</param>
-        public void SetState(string key, Dictionary<string, string> value)
+        public void SetState(string key, Dictionary<string, object> value)
         {
             var kv = GetOrCreateKeyValue("light_link_state");
-            string json = JsonHelper.Serialize(value);
+            string json = JsonSerializer.Serialize(value);
             byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
             kv.Put(key, data);
         }
@@ -197,12 +198,12 @@ namespace LightLink
         /// </summary>
         /// <param name="key">State key</param>
         /// <returns>State value dictionary</returns>
-        public Dictionary<string, string> GetState(string key)
+        public Dictionary<string, JsonElement> GetState(string key)
         {
             var kv = GetOrCreateKeyValue("light_link_state");
             var entry = kv.Get(key);
             string json = System.Text.Encoding.UTF8.GetString(entry.Value);
-            return JsonHelper.Deserialize<Dictionary<string, string>>(json);
+            return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
         }
 
         /// <summary>
@@ -232,12 +233,12 @@ namespace LightLink
             }
 
             // Publish metadata
-            var metadata = new Dictionary<string, string>
+            var metadata = new Dictionary<string, object>
             {
                 { "file_id", fileId },
                 { "file_name", remoteName },
-                { "file_size", fileData.Length.ToString() },
-                { "chunk_num", chunkNum.ToString() }
+                { "file_size", fileData.Length },
+                { "chunk_num", chunkNum }
             };
             Publish("file.uploaded", metadata);
 
@@ -339,14 +340,14 @@ namespace LightLink
     {
         public string Id { get; set; }
         public string Method { get; set; }
-        public Dictionary<string, string> Args { get; set; }
+        public Dictionary<string, object> Args { get; set; }
     }
 
     internal class RPCResponse
     {
         public string Id { get; set; }
         public bool Success { get; set; }
-        public Dictionary<string, string> Result { get; set; }
+        public Dictionary<string, JsonElement> Result { get; set; }
         public string Error { get; set; }
     }
 
