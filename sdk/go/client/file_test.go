@@ -1,7 +1,6 @@
 package client
 
 import (
-    "io/ioutil"
     "os"
     "testing"
 )
@@ -14,7 +13,7 @@ func TestFileTransfer(t *testing.T) {
     defer client.Close()
 
     // Create test file
-    tmpFile, err := ioutil.TempFile("", "test-*.txt")
+    tmpFile, err := os.CreateTemp("", "test-*.txt")
     if err != nil {
         t.Fatal(err)
     }
@@ -31,7 +30,7 @@ func TestFileTransfer(t *testing.T) {
     }
 
     // Download file
-    outFile, err := ioutil.TempFile("", "download-*.txt")
+    outFile, err := os.CreateTemp("", "download-*.txt")
     if err != nil {
         t.Fatal(err)
     }
@@ -44,7 +43,7 @@ func TestFileTransfer(t *testing.T) {
     }
 
     // Verify content
-    downloaded, _ := ioutil.ReadFile(outFile.Name())
+    downloaded, _ := os.ReadFile(outFile.Name())
     if string(downloaded) != string(testData) {
         t.Error("File content mismatch")
     }
