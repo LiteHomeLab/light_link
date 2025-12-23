@@ -3,7 +3,7 @@ package client
 import (
     "crypto/tls"
     "crypto/x509"
-    "io/ioutil"
+    "os"
     "time"
 
     "github.com/nats-io/nats.go"
@@ -64,7 +64,7 @@ func createTLSOption(config *TLSConfig) (nats.Option, error) {
 
     // Create CA pool
     pool := x509.NewCertPool()
-    caCert, err := ioutil.ReadFile(config.CaFile)
+    caCert, err := os.ReadFile(config.CaFile)
     if err != nil {
         return nil, err
     }
