@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LiteHomeLab/light_link/sdk/go/backup"
 	"github.com/LiteHomeLab/light_link/sdk/go/client"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
@@ -48,6 +49,10 @@ func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storage
 		svc.Stop()
 		return nil, err
 	}
+	if err := bs.RegisterRPC("backup.create_incremental", bs.handleCreateIncrementalBackup); err != nil {
+		svc.Stop()
+		return nil, err
+	}
 	if err := bs.RegisterRPC("backup.list", bs.handleListBackups); err != nil {
 		svc.Stop()
 		return nil, err
@@ -57,6 +62,10 @@ func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storage
 		return nil, err
 	}
 	if err := bs.RegisterRPC("backup.delete", bs.handleDeleteBackup); err != nil {
+		svc.Stop()
+		return nil, err
+	}
+	if err := bs.RegisterRPC("backup.cleanup", bs.handleCleanup); err != nil {
 		svc.Stop()
 		return nil, err
 	}
@@ -90,6 +99,7 @@ func (s *BackupService) loadMetadata(serviceName, backupName string) (*types.Bac
 				ServiceName:    serviceName,
 				BackupName:     backupName,
 				CurrentVersion: 0,
+				MaxVersions:    0,
 				Versions:       []types.BackupVersion{},
 			}, nil
 		}
@@ -136,6 +146,12 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 		return nil, fmt.Errorf("missing backup_name")
 	}
 
+	// Get max_versions parameter
+	maxVersions := 0
+	if mv, ok := args["max_versions"].(float64); ok {
+		maxVersions = int(mv)
+	}
+
 	// Decode base64 data
 	dataBase64, ok := args["data"].(string)
 	if !ok {
@@ -156,6 +172,11 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 
+	// Update max_versions if provided
+	if maxVersions > 0 {
+		metadata.MaxVersions = maxVersions
+	}
+
 	// Increment version
 	metadata.CurrentVersion++
 	version := metadata.CurrentVersion
@@ -167,6 +188,7 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 	// Create version info
 	versionInfo := types.BackupVersion{
 		Version:   version,
+		Type:      "full",
 		FileSize:  int64(len(data)),
 		Checksum:  checksum,
 		CreatedAt: time.Now(),
@@ -188,11 +210,169 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 		return nil, fmt.Errorf("save metadata: %w", err)
 	}
 
-	return map[string]interface{}{
-		"version": version,
-		"size":    versionInfo.FileSize,
+	// Auto cleanup if max_versions is set
+	cleanupCount := 0
+	if metadata.MaxVersions > 0 && len(metadata.Versions) > metadata.MaxVersions {
+		cleanupCount = s.cleanupOldVersionsLocked(metadata)
+		// Save metadata after cleanup
+		if err := s.saveMetadata(metadata); err != nil {
+			// Log but don't fail the backup
+			fmt.Printf("Warning: failed to save metadata after cleanup: %v\n", err)
+		}
+	}
+
+	result := map[string]interface{}{
+		"version":  version,
+		"size":     versionInfo.FileSize,
 		"checksum": checksum,
-	}, nil
+	}
+
+	if cleanupCount > 0 {
+		result["cleaned"] = cleanupCount
+	}
+
+	return result, nil
+}
+
+// handleCreateIncrementalBackup handles incremental backup creation requests
+func (s *BackupService) handleCreateIncrementalBackup(args map[string]interface{}) (map[string]interface{}, error) {
+	serviceName, ok := args["service_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing service_name")
+	}
+
+	backupName, ok := args["backup_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing backup_name")
+	}
+
+	// Get max_versions parameter
+	maxVersions := 0
+	if mv, ok := args["max_versions"].(float64); ok {
+		maxVersions = int(mv)
+	}
+
+	// Decode base64 data
+	dataBase64, ok := args["data"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing data")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(dataBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode data: %w", err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Load current metadata
+	metadata, err := s.loadMetadata(serviceName, backupName)
+	if err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
+	// Check if there's a previous version
+	if metadata.CurrentVersion == 0 {
+		return nil, fmt.Errorf("no previous backup found, create a full backup first")
+	}
+
+	// Get the latest version (or find the latest full version)
+	var latestVersionData []byte
+	var baseVersion int
+
+	// Try to find the latest full version as base
+	for i := len(metadata.Versions) - 1; i >= 0; i-- {
+		if metadata.Versions[i].Type == "full" {
+			baseVersion = metadata.Versions[i].Version
+			// Read the full version file
+			versionPath := s.getVersionPath(serviceName, backupName, baseVersion)
+			latestVersionData, err = os.ReadFile(versionPath)
+			if err != nil {
+				return nil, fmt.Errorf("read base version %d: %w", baseVersion, err)
+			}
+			break
+		}
+	}
+
+	if latestVersionData == nil {
+		return nil, fmt.Errorf("no full backup found to create incremental from")
+	}
+
+	// Calculate diff
+	diffOps, err := backup.BinaryDiff(latestVersionData, data)
+	if err != nil {
+		return nil, fmt.Errorf("calculate diff: %w", err)
+	}
+
+	// Serialize diff operations
+	diffData, err := backup.SerializeDiffOps(diffOps)
+	if err != nil {
+		return nil, fmt.Errorf("serialize diff: %w", err)
+	}
+
+	// Increment version
+	metadata.CurrentVersion++
+	version := metadata.CurrentVersion
+
+	// Calculate checksum
+	hash := sha256.Sum256(diffData)
+	checksum := hex.EncodeToString(hash[:])
+
+	// Create version info
+	versionInfo := types.BackupVersion{
+		Version:     version,
+		Type:        "incremental",
+		BaseVersion: baseVersion,
+		FileSize:    int64(len(diffData)),
+		Checksum:    checksum,
+		CreatedAt:   time.Now(),
+	}
+
+	// Save diff data to file
+	versionPath := s.getVersionPath(serviceName, backupName, version)
+	if err := os.WriteFile(versionPath, diffData, 0644); err != nil {
+		return nil, fmt.Errorf("write version file: %w", err)
+	}
+
+	// Update metadata
+	metadata.Versions = append(metadata.Versions, versionInfo)
+
+	// Update max_versions if provided
+	if maxVersions > 0 {
+		metadata.MaxVersions = maxVersions
+	}
+
+	// Save metadata
+	if err := s.saveMetadata(metadata); err != nil {
+		// Clean up version file if metadata save fails
+		os.Remove(versionPath)
+		return nil, fmt.Errorf("save metadata: %w", err)
+	}
+
+	// Auto cleanup if max_versions is set
+	cleanupCount := 0
+	if metadata.MaxVersions > 0 && len(metadata.Versions) > metadata.MaxVersions {
+		cleanupCount = s.cleanupOldVersionsLocked(metadata)
+		// Save metadata after cleanup
+		if err := s.saveMetadata(metadata); err != nil {
+			fmt.Printf("Warning: failed to save metadata after cleanup: %v\n", err)
+		}
+	}
+
+	result := map[string]interface{}{
+		"version":     version,
+		"size":        versionInfo.FileSize,
+		"checksum":    checksum,
+		"type":        "incremental",
+		"base_version": baseVersion,
+	}
+
+	if cleanupCount > 0 {
+		result["cleaned"] = cleanupCount
+	}
+
+	return result, nil
 }
 
 // handleListBackups handles list backup versions requests
@@ -340,3 +520,81 @@ func (s *BackupService) handleDeleteBackup(args map[string]interface{}) (map[str
 		"version": version,
 	}, nil
 }
+
+// handleCleanup handles cleanup old versions requests
+func (s *BackupService) handleCleanup(args map[string]interface{}) (map[string]interface{}, error) {
+	serviceName, ok := args["service_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing service_name")
+	}
+
+	backupName, ok := args["backup_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing backup_name")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	metadata, err := s.loadMetadata(serviceName, backupName)
+	if err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
+	// If no max_versions set, return without doing anything
+	if metadata.MaxVersions <= 0 {
+		return map[string]interface{}{
+			"cleaned": 0,
+			"message": "no max_versions configured",
+		}, nil
+	}
+
+	cleaned := s.cleanupOldVersionsLocked(metadata)
+
+	// Save metadata after cleanup
+	if err := s.saveMetadata(metadata); err != nil {
+		return nil, fmt.Errorf("save metadata: %w", err)
+	}
+
+	return map[string]interface{}{
+		"cleaned": cleaned,
+	}, nil
+}
+
+// cleanupOldVersionsLocked removes old versions based on MaxVersions setting
+// Must be called with mu.Lock() held
+func (s *BackupService) cleanupOldVersionsLocked(metadata *types.BackupMetadata) int {
+	if metadata.MaxVersions <= 0 {
+		return 0
+	}
+
+	// Keep the most recent MaxVersions versions
+	versionsToKeep := metadata.MaxVersions
+	totalVersions := len(metadata.Versions)
+
+	if totalVersions <= versionsToKeep {
+		return 0
+	}
+
+	cleaned := 0
+
+	// Delete old version files and update metadata
+	for i := 0; i < totalVersions-versionsToKeep; i++ {
+		version := metadata.Versions[i]
+		versionPath := s.getVersionPath(metadata.ServiceName, metadata.BackupName, version.Version)
+
+		// Delete the file
+		if err := os.Remove(versionPath); err != nil && !os.IsNotExist(err) {
+			// Log but continue
+			fmt.Printf("Warning: failed to delete version file %d: %v\n", version.Version, err)
+		} else {
+			cleaned++
+		}
+	}
+
+	// Keep only the last MaxVersions versions
+	metadata.Versions = metadata.Versions[totalVersions-versionsToKeep:]
+
+	return cleaned
+}
+

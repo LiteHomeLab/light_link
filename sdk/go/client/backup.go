@@ -27,6 +27,49 @@ func (c *Client) CreateBackup(serviceName, backupName string, data []byte) (int,
 	return int(versionFloat), nil
 }
 
+// CreateBackupWithMaxVersions creates a full backup with version retention policy
+func (c *Client) CreateBackupWithMaxVersions(serviceName, backupName string, data []byte, maxVersions int) (int, error) {
+	args := map[string]interface{}{
+		"service_name": serviceName,
+		"backup_name":  backupName,
+		"data":         base64.StdEncoding.EncodeToString(data),
+		"max_versions": float64(maxVersions),
+	}
+
+	result, err := c.Call("backup-agent", "backup.create", args)
+	if err != nil {
+		return 0, err
+	}
+
+	versionFloat, ok := result["version"].(float64)
+	if !ok {
+		return 0, nil
+	}
+
+	return int(versionFloat), nil
+}
+
+// CreateIncrementalBackup creates an incremental backup
+func (c *Client) CreateIncrementalBackup(serviceName, backupName string, data []byte) (int, error) {
+	args := map[string]interface{}{
+		"service_name": serviceName,
+		"backup_name":  backupName,
+		"data":         base64.StdEncoding.EncodeToString(data),
+	}
+
+	result, err := c.Call("backup-agent", "backup.create_incremental", args)
+	if err != nil {
+		return 0, err
+	}
+
+	versionFloat, ok := result["version"].(float64)
+	if !ok {
+		return 0, nil
+	}
+
+	return int(versionFloat), nil
+}
+
 // ListBackups lists all backup versions
 func (c *Client) ListBackups(serviceName, backupName string) ([]types.BackupVersion, error) {
 	args := map[string]interface{}{
@@ -98,5 +141,16 @@ func (c *Client) DeleteBackup(serviceName, backupName string, version int) error
 	}
 
 	_, err := c.Call("backup-agent", "backup.delete", args)
+	return err
+}
+
+// CleanupOldVersions cleans up old versions based on retention policy
+func (c *Client) CleanupOldVersions(serviceName, backupName string) error {
+	args := map[string]interface{}{
+		"service_name": serviceName,
+		"backup_name":  backupName,
+	}
+
+	_, err := c.Call("backup-agent", "backup.cleanup", args)
 	return err
 }
