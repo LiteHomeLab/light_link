@@ -4,7 +4,7 @@ import uuid
 import os
 import ssl
 from nats.aio.client import Client as NATSClient
-from nats.errors import TimeoutError
+from nats.errors import TimeoutError, NotFoundError, BadRequestError
 
 
 class TLSConfig:
@@ -126,7 +126,7 @@ class Client:
         """Get or create KV bucket"""
         try:
             kv = await self.js.key_value(bucket_name)
-        except:
+        except (NotFoundError, BadRequestError):
             kv = await self.js.create_key_value(bucket=bucket_name)
         return kv
 
@@ -176,13 +176,16 @@ class Client:
                     chunk = await obj_store.get(chunk_key)
                     f.write(chunk.data)
                     chunk_num += 1
-                except:
+                except NotFoundError:
+                    # No more chunks
                     break
+                except (TimeoutError, BadRequestError) as e:
+                    raise RuntimeError(f"Failed to download chunk {chunk_num}: {e}")
 
     async def _get_or_create_object_store(self, bucket_name):
         """Get or create Object Store"""
         try:
             obj_store = await self.js.object_store(bucket_name)
-        except:
+        except (NotFoundError, BadRequestError):
             obj_store = await self.js.create_object_store(bucket_name)
         return obj_store
