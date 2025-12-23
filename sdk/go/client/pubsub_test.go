@@ -1,0 +1,47 @@
+package client
+
+import (
+    "testing"
+    "time"
+)
+
+func TestPublishSubscribe(t *testing.T) {
+    subClient, err := NewClient("nats://localhost:4222", nil)
+    if err != nil {
+        t.Skip("Need running NATS server:", err)
+    }
+    defer subClient.Close()
+
+    pubClient, err := NewClient("nats://localhost:4222", nil)
+    if err != nil {
+        t.Skip("Need running NATS server:", err)
+    }
+    defer pubClient.Close()
+
+    received := make(chan map[string]interface{}, 1)
+
+    // Subscribe
+    sub, err := subClient.Subscribe("test.subject", func(data map[string]interface{}) {
+        received <- data
+    })
+    if err != nil {
+        t.Fatalf("Subscribe failed: %v", err)
+    }
+    defer sub.Unsubscribe()
+
+    // Publish
+    err = pubClient.Publish("test.subject", map[string]interface{}{"msg": "hello"})
+    if err != nil {
+        t.Fatalf("Publish failed: %v", err)
+    }
+
+    // Wait for receive
+    select {
+    case data := <-received:
+        if data["msg"] != "hello" {
+            t.Errorf("Expected 'hello', got '%v'", data["msg"])
+        }
+    case <-time.After(2 * time.Second):
+        t.Error("Timeout waiting for message")
+    }
+}
