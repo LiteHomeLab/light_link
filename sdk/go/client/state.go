@@ -89,22 +89,20 @@ func (c *Client) WatchState(key string, handler func(map[string]interface{})) (f
     stop := make(chan struct{})
 
     go func() {
+        defer watcher.Stop()
         for {
             select {
             case <-stop:
-                watcher.Stop()
                 return
-            default:
-                select {
-                case entry := <-watcher.Updates():
-                    if entry != nil {
-                        var value map[string]interface{}
-                        json.Unmarshal(entry.Value(), &value)
+            case entry, ok := <-watcher.Updates():
+                if !ok {
+                    return
+                }
+                if entry != nil {
+                    var value map[string]interface{}
+                    if err := json.Unmarshal(entry.Value(), &value); err == nil {
                         handler(value)
                     }
-                case <-stop:
-                    watcher.Stop()
-                    return
                 }
             }
         }
