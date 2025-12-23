@@ -1,1 +1,38 @@
 nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# C#
+**/bin/
+**/obj/
+*.dll
+*.exe
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Logs and temp
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
