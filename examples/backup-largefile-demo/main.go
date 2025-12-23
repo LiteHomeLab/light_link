@@ -60,9 +60,33 @@ func main() {
 	fmt.Println("\n[4/6] Uploading backup in chunks...")
 	startTime := time.Now()
 
-	version, err := cli.UploadChunkedComplete(serviceName, backupName, testData)
+	// Create chunk splitter with custom size to avoid NATS payload limit
+	// 512KB chunks with base64 encoding will stay under the 1MB limit
+	splitter := client.NewChunkSplitter(testData)
+	splitter.SetChunkSize(512 * 1024)
+
+	// Get chunks to see how many we'll have
+	chunks, err := splitter.SplitAll()
 	if err != nil {
-		log.Fatalf("Failed to upload chunked backup: %v", err)
+		log.Fatalf("Failed to split data: %v", err)
+	}
+	fmt.Printf("   Split into %d chunks (512KB each)\n", len(chunks))
+
+	// Upload with the pre-configured splitter
+	handle, err := cli.UploadChunkedWithSplitter(serviceName, backupName, splitter)
+	if err != nil {
+		log.Fatalf("Failed to start chunked upload: %v", err)
+	}
+
+	// Upload all chunks
+	if err := handle.UploadAll(); err != nil {
+		log.Fatalf("Failed to upload chunks: %v", err)
+	}
+
+	// Complete the upload
+	version, err := handle.Complete()
+	if err != nil {
+		log.Fatalf("Failed to complete chunked backup: %v", err)
 	}
 
 	duration := time.Since(startTime)
@@ -86,7 +110,15 @@ func main() {
 	fmt.Println("\n[6/6] Downloading backup in chunks...")
 	startTime = time.Now()
 
-	downloadedData, err := cli.DownloadChunkedComplete(serviceName, backupName, version)
+	// Use 512KB chunks for download to match upload and avoid NATS payload limit
+	downloadHandle, err := cli.DownloadChunkedWithSize(serviceName, backupName, version, 512*1024)
+	if err != nil {
+		log.Fatalf("Failed to start chunked download: %v", err)
+	}
+
+	fmt.Printf("   Downloading %d chunks (512KB each)...\n", downloadHandle.TotalChunks)
+
+	downloadedData, err := downloadHandle.DownloadAll()
 	if err != nil {
 		log.Fatalf("Failed to download chunked backup: %v", err)
 	}

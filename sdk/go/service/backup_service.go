@@ -16,13 +16,20 @@ import (
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
+// chunkDownloadState tracks an ongoing chunked download
+type chunkDownloadState struct {
+	metadata  backup.ChunkMetadata
+	data      []byte
+	chunkSize int
+}
+
 // BackupService manages backup storage and retrieval
 type BackupService struct {
 	*Service
 	storagePath    string
 	mu             sync.RWMutex
 	uploads        map[string]*chunkUploadState  // transfer_id -> upload state
-	downloads      map[string]*backup.ChunkMetadata // transfer_id -> download metadata
+	downloads      map[string]*chunkDownloadState // transfer_id -> download state
 	uploadMu       sync.RWMutex
 	downloadMu     sync.RWMutex
 }
@@ -57,7 +64,7 @@ func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storage
 		Service:     svc,
 		storagePath: storagePath,
 		uploads:     make(map[string]*chunkUploadState),
-		downloads:   make(map[string]*backup.ChunkMetadata),
+		downloads:   make(map[string]*chunkDownloadState),
 	}
 
 	// Register RPC handlers
@@ -867,6 +874,12 @@ func (s *BackupService) handleDownloadInit(args map[string]interface{}) (map[str
 	}
 	version := int(versionFloat)
 
+	// Get optional chunk_size parameter
+	chunkSize := backup.ChunkSize
+	if cs, ok := args["chunk_size"].(float64); ok {
+		chunkSize = int(cs)
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -892,15 +905,21 @@ func (s *BackupService) handleDownloadInit(args map[string]interface{}) (map[str
 
 	// Create chunk metadata
 	chunkMetadata := backup.ChunkMetadata{
-		TotalChunks: uint32((len(data) + backup.ChunkSize - 1) / backup.ChunkSize),
+		TotalChunks: uint32((len(data) + chunkSize - 1) / chunkSize),
 		TotalSize:   uint64(len(data)),
 		FileID:      transferID,
 		Checksum:    backup.CalculateChecksum(data),
 	}
 
-	// Store download state
+	// Store download state in memory with cached data and requested chunk size
+	downloadState := &chunkDownloadState{
+		metadata:  chunkMetadata,
+		data:      data,
+		chunkSize: chunkSize,
+	}
+
 	s.downloadMu.Lock()
-	s.downloads[transferID] = &chunkMetadata
+	s.downloads[transferID] = downloadState
 	s.downloadMu.Unlock()
 
 	// Serialize metadata for response
@@ -909,20 +928,11 @@ func (s *BackupService) handleDownloadInit(args map[string]interface{}) (map[str
 		return nil, fmt.Errorf("serialize metadata: %w", err)
 	}
 
-	// Store data in a temp location for chunk retrieval
-	tempDir := filepath.Join(s.storagePath, "temp")
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return nil, fmt.Errorf("create temp dir: %w", err)
-	}
-	tempFile := filepath.Join(tempDir, transferID+".tmp")
-	if err := os.WriteFile(tempFile, data, 0644); err != nil {
-		return nil, fmt.Errorf("write temp file: %w", err)
-	}
-
 	return map[string]interface{}{
 		"transfer_id":  transferID,
 		"total_chunks": float64(chunkMetadata.TotalChunks),
 		"total_size":   float64(chunkMetadata.TotalSize),
+		"chunk_size":   float64(chunkSize),
 		"metadata":     base64.StdEncoding.EncodeToString(metadataBytes),
 	}, nil
 }
@@ -941,23 +951,19 @@ func (s *BackupService) handleDownloadChunk(args map[string]interface{}) (map[st
 	chunkIndex := uint32(chunkIndexFloat)
 
 	s.downloadMu.Lock()
-	_, ok = s.downloads[transferID]
+	state, ok := s.downloads[transferID]
 	s.downloadMu.Unlock()
 
 	if !ok {
 		return nil, fmt.Errorf("download not found: %s", transferID)
 	}
 
-	// Read the temp file
-	tempFile := filepath.Join(s.storagePath, "temp", transferID+".tmp")
-	data, err := os.ReadFile(tempFile)
-	if err != nil {
-		return nil, fmt.Errorf("read temp file: %w", err)
-	}
+	data := state.data
+	chunkSize := state.chunkSize
 
 	// Extract the requested chunk
-	start := int(chunkIndex) * backup.ChunkSize
-	end := start + backup.ChunkSize
+	start := int(chunkIndex) * chunkSize
+	end := start + chunkSize
 	if end > len(data) {
 		end = len(data)
 	}

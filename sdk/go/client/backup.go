@@ -168,7 +168,7 @@ type ChunkedUploadHandle struct {
 	client      *Client
 	transferID  string
 	totalChunks int
-	splitter    *ChunkSplitter
+	Splitter    *ChunkSplitter
 }
 
 // ChunkSplitter wraps the backup.ChunkSplitter for client use
@@ -206,7 +206,11 @@ func (cs *ChunkSplitter) SplitAll() ([]backup.Chunk, error) {
 // UploadChunked starts a chunked upload
 func (c *Client) UploadChunked(serviceName, backupName string, data []byte) (*ChunkedUploadHandle, error) {
 	splitter := NewChunkSplitter(data)
+	return c.UploadChunkedWithSplitter(serviceName, backupName, splitter)
+}
 
+// UploadChunkedWithSplitter starts a chunked upload with a pre-configured splitter
+func (c *Client) UploadChunkedWithSplitter(serviceName, backupName string, splitter *ChunkSplitter) (*ChunkedUploadHandle, error) {
 	metadata := splitter.Metadata()
 	metadataBytes, err := backup.SerializeMetadata(metadata)
 	if err != nil {
@@ -238,7 +242,7 @@ func (c *Client) UploadChunked(serviceName, backupName string, data []byte) (*Ch
 		client:      c,
 		transferID:  transferID,
 		totalChunks: int(totalChunksFloat),
-		splitter:    splitter,
+		Splitter:    splitter,
 	}, nil
 }
 
@@ -260,7 +264,7 @@ func (h *ChunkedUploadHandle) UploadNextChunk(chunk backup.Chunk) error {
 
 // UploadAll uploads all chunks
 func (h *ChunkedUploadHandle) UploadAll() error {
-	chunks, err := h.splitter.SplitAll()
+	chunks, err := h.Splitter.SplitAll()
 	if err != nil {
 		return fmt.Errorf("split chunks: %w", err)
 	}
@@ -311,16 +315,22 @@ func (c *Client) UploadChunkedComplete(serviceName, backupName string, data []by
 type ChunkedDownloadHandle struct {
 	client      *Client
 	transferID  string
-	totalChunks int
+	TotalChunks int
 	metadata    backup.ChunkMetadata
 }
 
 // DownloadChunked starts a chunked download
 func (c *Client) DownloadChunked(serviceName, backupName string, version int) (*ChunkedDownloadHandle, error) {
+	return c.DownloadChunkedWithSize(serviceName, backupName, version, backup.ChunkSize)
+}
+
+// DownloadChunkedWithSize starts a chunked download with custom chunk size
+func (c *Client) DownloadChunkedWithSize(serviceName, backupName string, version int, chunkSize int) (*ChunkedDownloadHandle, error) {
 	args := map[string]interface{}{
 		"service_name": serviceName,
 		"backup_name":  backupName,
 		"version":      float64(version),
+		"chunk_size":   float64(chunkSize),
 	}
 
 	result, err := c.Call("backup-agent", "backup.download_init", args)
@@ -356,7 +366,7 @@ func (c *Client) DownloadChunked(serviceName, backupName string, version int) (*
 	return &ChunkedDownloadHandle{
 		client:      c,
 		transferID:  transferID,
-		totalChunks: int(totalChunksFloat),
+		TotalChunks: int(totalChunksFloat),
 		metadata:    metadata,
 	}, nil
 }
