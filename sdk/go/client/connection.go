@@ -39,7 +39,7 @@ func NewClient(url string, tlsConfig *TLSConfig) (*Client, error) {
 
     // Configure TLS
     if tlsConfig != nil {
-        tlsOpt, err := createTLSOption(tlsConfig)
+        tlsOpt, err := CreateTLSOption(tlsConfig)
         if err != nil {
             return nil, err
         }
@@ -54,8 +54,8 @@ func NewClient(url string, tlsConfig *TLSConfig) (*Client, error) {
     return &Client{nc: nc}, nil
 }
 
-// createTLSOption creates a TLS option
-func createTLSOption(config *TLSConfig) (nats.Option, error) {
+// CreateTLSOption creates a TLS option
+func CreateTLSOption(config *TLSConfig) (nats.Option, error) {
     // Load client certificate
     cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
     if err != nil {

@@ -7,6 +7,7 @@ import (
     "time"
 
     "github.com/nats-io/nats.go"
+    "github.com/LiteHomeLab/light_link/sdk/go/client"
     "github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
@@ -23,12 +24,23 @@ type Service struct {
 }
 
 // NewService creates a new service
-func NewService(name, natsURL string, tlsConfig interface{}) (*Service, error) {
-    nc, err := nats.Connect(natsURL,
+func NewService(name, natsURL string, tlsConfig *client.TLSConfig) (*Service, error) {
+    opts := []nats.Option{
         nats.Name("LightLink Service: "+name),
-        nats.ReconnectWait(2*time.Second),
+        nats.ReconnectWait(2 * time.Second),
         nats.MaxReconnects(10),
-    )
+    }
+
+    // Configure TLS
+    if tlsConfig != nil {
+        tlsOpt, err := client.CreateTLSOption(tlsConfig)
+        if err != nil {
+            return nil, err
+        }
+        opts = append(opts, tlsOpt)
+    }
+
+    nc, err := nats.Connect(natsURL, opts...)
     if err != nil {
         return nil, err
     }
