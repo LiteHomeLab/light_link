@@ -196,6 +196,10 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 
 	// Save data to file
 	versionPath := s.getVersionPath(serviceName, backupName, version)
+	versionDir := filepath.Dir(versionPath)
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		return nil, fmt.Errorf("create backup dir: %w", err)
+	}
 	if err := os.WriteFile(versionPath, data, 0644); err != nil {
 		return nil, fmt.Errorf("write version file: %w", err)
 	}
@@ -222,7 +226,7 @@ func (s *BackupService) handleCreateBackup(args map[string]interface{}) (map[str
 	}
 
 	result := map[string]interface{}{
-		"version":  version,
+		"version":  float64(version),
 		"size":     versionInfo.FileSize,
 		"checksum": checksum,
 	}
@@ -331,6 +335,10 @@ func (s *BackupService) handleCreateIncrementalBackup(args map[string]interface{
 
 	// Save diff data to file
 	versionPath := s.getVersionPath(serviceName, backupName, version)
+	versionDir := filepath.Dir(versionPath)
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		return nil, fmt.Errorf("create backup dir: %w", err)
+	}
 	if err := os.WriteFile(versionPath, diffData, 0644); err != nil {
 		return nil, fmt.Errorf("write version file: %w", err)
 	}
@@ -361,11 +369,11 @@ func (s *BackupService) handleCreateIncrementalBackup(args map[string]interface{
 	}
 
 	result := map[string]interface{}{
-		"version":     version,
-		"size":        versionInfo.FileSize,
-		"checksum":    checksum,
-		"type":        "incremental",
-		"base_version": baseVersion,
+		"version":      float64(version),
+		"size":         versionInfo.FileSize,
+		"checksum":     checksum,
+		"type":         "incremental",
+		"base_version": float64(baseVersion),
 	}
 
 	if cleanupCount > 0 {
@@ -396,7 +404,7 @@ func (s *BackupService) handleListBackups(args map[string]interface{}) (map[stri
 	}
 
 	return map[string]interface{}{
-		"current_version": metadata.CurrentVersion,
+		"current_version": float64(metadata.CurrentVersion),
 		"versions":        metadata.Versions,
 	}, nil
 }
@@ -517,7 +525,7 @@ func (s *BackupService) handleDeleteBackup(args map[string]interface{}) (map[str
 
 	return map[string]interface{}{
 		"deleted": true,
-		"version": version,
+		"version": float64(version),
 	}, nil
 }
 

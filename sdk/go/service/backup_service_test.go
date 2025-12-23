@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
 func TestBackupService_CreateAndList(t *testing.T) {
@@ -375,9 +377,24 @@ func TestBackupService_VersionListOrder(t *testing.T) {
 		t.Fatal("list backups failed:", err)
 	}
 
+	// Versions can be either []types.BackupVersion (direct call) or []interface{} (after JSON)
 	versionsInterface, ok := listResult["versions"].([]interface{})
 	if !ok {
-		t.Fatal("expected versions array")
+		// If not []interface{}, try to get the count from the actual type
+		versionsSlice, ok2 := listResult["versions"].([]types.BackupVersion)
+		if !ok2 {
+			t.Fatal("expected versions array")
+		}
+		if len(versionsSlice) != 5 {
+			t.Error("expected 5 versions, got", len(versionsSlice))
+		}
+		// Verify versions are in ascending order
+		for i, v := range versionsSlice {
+			if v.Version != i+1 {
+				t.Error("version", i, "has incorrect number:", v.Version)
+			}
+		}
+		return
 	}
 
 	if len(versionsInterface) != 5 {

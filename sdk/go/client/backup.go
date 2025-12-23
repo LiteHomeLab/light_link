@@ -98,6 +98,12 @@ func (c *Client) ListBackups(serviceName, backupName string) ([]types.BackupVers
 		if val, ok := vMap["version"].(float64); ok {
 			version.Version = int(val)
 		}
+		if val, ok := vMap["type"].(string); ok {
+			version.Type = val
+		}
+		if val, ok := vMap["base_version"].(float64); ok {
+			version.BaseVersion = int(val)
+		}
 		if val, ok := vMap["file_size"].(float64); ok {
 			version.FileSize = int64(val)
 		}
