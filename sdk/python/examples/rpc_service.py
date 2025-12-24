@@ -21,7 +21,7 @@ async def multiply_handler(args: dict) -> dict:
 
 
 async def main():
-    svc = Service("math-service", "nats://localhost:4222")
+    svc = Service("math-service", "nats://172.18.200.47:4222")
 
     await svc.register_rpc("add", add_handler)
     await svc.register_rpc("multiply", multiply_handler)

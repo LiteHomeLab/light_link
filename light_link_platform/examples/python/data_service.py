@@ -47,7 +47,7 @@ async def aggregate_handler(args: dict) -> dict:
 async def main():
     # Try with just URL, no TLS
     import os
-    nats_url = os.getenv("NATS_URL", "nats://localhost:4222")
+    nats_url = os.getenv("NATS_URL", "nats://172.18.200.47:4222")
     svc = Service("python-data-service", nats_url)
 
     # Register filter method with metadata
