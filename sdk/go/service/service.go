@@ -16,11 +16,15 @@ type RPCHandler func(args map[string]interface{}) (map[string]interface{}, error
 
 // Service represents a service
 type Service struct {
-    name     string
-    nc       *nats.Conn
-    rpcMap   map[string]RPCHandler
-    rpcMutex sync.RWMutex
-    running  bool
+    name        string
+    nc          *nats.Conn
+    rpcMap      map[string]RPCHandler
+    rpcMutex    sync.RWMutex
+    metadata    *types.ServiceMetadata
+    metaMutex   sync.RWMutex
+    methodsMeta map[string]*types.MethodMetadata
+    running     bool
+    heartbeatStop chan struct{}
 }
 
 // NewService creates a new service
@@ -46,9 +50,11 @@ func NewService(name, natsURL string, tlsConfig *client.TLSConfig) (*Service, er
     }
 
     return &Service{
-        name:   name,
-        nc:     nc,
-        rpcMap: make(map[string]RPCHandler),
+        name:          name,
+        nc:            nc,
+        rpcMap:        make(map[string]RPCHandler),
+        methodsMeta:   make(map[string]*types.MethodMetadata),
+        heartbeatStop: make(chan struct{}),
     }, nil
 }
 
@@ -86,6 +92,11 @@ func (s *Service) Start() error {
     _, err := s.nc.Subscribe(subject, s.handleRPC)
     if err != nil {
         return fmt.Errorf("subscribe failed: %w", err)
+    }
+
+    // Start heartbeat
+    if err := s.startHeartbeat(); err != nil {
+        return fmt.Errorf("start heartbeat: %w", err)
     }
 
     s.running = true
@@ -145,6 +156,10 @@ func (s *Service) Stop() error {
     if !s.running {
         return nil
     }
+
+    // Stop heartbeat
+    close(s.heartbeatStop)
+    s.heartbeatStop = make(chan struct{})
 
     s.nc.Close()
     s.running = false
