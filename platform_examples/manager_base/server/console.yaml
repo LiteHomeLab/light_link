@@ -1,0 +1,22 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+nats:
+  url: "nats://localhost:4222"
+  tls:
+    enabled: false
+
+database:
+  path: "data/light_link.db"
+
+jwt:
+  secret: "light-link-secret-key-change-in-production"
+  expiry: 24h
+
+heartbeat:
+  timeout: 90s
+
+admin:
+  username: "admin"
+  password: "admin123"

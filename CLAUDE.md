@@ -21,8 +21,14 @@ light_link/
 │   ├── service/         # 服务端 (RPC 注册和处理)
 │   └── types/           # 公共类型定义
 ├── sdk/python/          # Python SDK
+├── sdk/csharp/          # C# SDK
 ├── deploy/nats/         # NATS 服务器配置和 TLS 证书
-├── examples/            # 示例项目
+├── examples/            # SDK 基础功能示例
+├── platform_examples/   # 管理平台和多语言示例服务
+│   ├── manager_base/    # 管理平台 (server + web)
+│   ├── go/              # Go 示例服务
+│   ├── csharp/          # C# 示例服务
+│   └── python/          # Python 示例服务
 └── docs/                # 文档
 ```
 
@@ -35,6 +41,12 @@ light_link/
 5. 遵循 TDD 开发模式：先写测试，再实现功能
 6. 每个功能完成后提交一次代码
 7. 所有测试必须通过后才能提交
+8. **平台示例管理**: 所有管理平台和多语言示例服务统一放在 `platform_examples/` 目录下
+   - `manager_base/` - 管理平台（后端 + 前端在一个文件夹）
+   - `go/` - Go 示例服务
+   - `csharp/` - C# 示例服务
+   - `python/` - Python 示例服务
+   - 新增示例服务时，请放入对应的语言子目录
 
 ## NATS 服务配置
 
@@ -59,6 +71,7 @@ go test ./...
 
 ### 运行示例
 
+**SDK 基础功能示例:**
 ```bash
 # RPC 演示
 go run examples/rpc-demo/main.go
@@ -71,4 +84,24 @@ go run examples/state-demo/main.go
 
 # 文件传输演示
 go run examples/file-transfer-demo/main.go
+```
+
+**管理平台和示例服务 (platform_examples):**
+```bash
+# 启动管理平台
+cd platform_examples/manager_base/server
+go run main.go
+# 访问 http://localhost:8080
+
+# 启动 Go 示例服务
+cd platform_examples/go/metadata-demo
+go run main.go
+
+# 启动 C# 示例服务
+cd platform_examples/csharp/TextServiceDemo
+dotnet run
+
+# 启动 Python 示例服务
+cd platform_examples/python
+python data_service.py
 ```
