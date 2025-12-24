@@ -112,7 +112,7 @@ func GetDefaultConfig() *Config {
 			Port: 8080,
 		},
 		NATS: NATSConfig{
-			URL: "nats://localhost:4222",
+			URL: "nats://172.18.200.47:4222",
 		},
 		Database: DatabaseConfig{
 			Path: "data/light_link.db",
