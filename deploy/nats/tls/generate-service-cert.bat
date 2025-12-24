@@ -21,14 +21,49 @@ echo.
 echo Service Name: %SERVICE_NAME%
 echo.
 
-REM Check OpenSSL
+REM Check OpenSSL in PATH
+set "OPENSSL_CMD="
 where openssl >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: OpenSSL not found in PATH
-    echo Please install OpenSSL or add it to PATH
-    pause
-    exit /b 1
+if not errorlevel 1 (
+    set "OPENSSL_CMD=openssl"
+    goto openssl_found
 )
+
+REM Check common OpenSSL installation paths
+if exist "C:\Program Files\Git\mingw64\bin\openssl.exe" (
+    set "OPENSSL_CMD=C:\Program Files\Git\mingw64\bin\openssl.exe"
+    goto openssl_found
+)
+if exist "C:\Program Files\Git\usr\bin\openssl.exe" (
+    set "OPENSSL_CMD=C:\Program Files\Git\usr\bin\openssl.exe"
+    goto openssl_found
+)
+if exist "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" (
+    set "OPENSSL_CMD=C:\Program Files\OpenSSL-Win64\bin\openssl.exe"
+    goto openssl_found
+)
+if exist "C:\Program Files (x86)\Git\mingw64\bin\openssl.exe" (
+    set "OPENSSL_CMD=C:\Program Files (x86)\Git\mingw64\bin\openssl.exe"
+    goto openssl_found
+)
+if exist "C:\Program Files (x86)\Git\usr\bin\openssl.exe" (
+    set "OPENSSL_CMD=C:\Program Files (x86)\Git\usr\bin\openssl.exe"
+    goto openssl_found
+)
+
+REM OpenSSL not found
+echo ERROR: OpenSSL not found
+echo.
+echo Please install one of the following:
+echo   1. Git for Windows: https://git-scm.com/download/win
+echo   2. OpenSSL for Windows: https://slproweb.com/products/Win32OpenSSL.html
+echo.
+echo Then add OpenSSL to your PATH or restart this script.
+pause
+exit /b 1
+
+:openssl_found
+echo Using OpenSSL: %OPENSSL_CMD%
 
 REM Check CA exists
 if not exist "ca.crt" (
@@ -47,19 +82,19 @@ if not exist "ca.key" (
 
 REM Generate private key
 echo [1/4] Generating private key for %SERVICE_NAME%...
-openssl genrsa -out %SERVICE_NAME%.key 2048
+"%OPENSSL_CMD%" genrsa -out %SERVICE_NAME%.key 2048
 if errorlevel 1 goto error
 echo Private key generated successfully
 
 REM Generate CSR
 echo [2/4] Generating certificate signing request...
-openssl req -new -key %SERVICE_NAME%.key -out %SERVICE_NAME%.csr -subj "/CN=%SERVICE_NAME%"
+"%OPENSSL_CMD%" req -new -key %SERVICE_NAME%.key -out %SERVICE_NAME%.csr -subj "/CN=%SERVICE_NAME%"
 if errorlevel 1 goto error
 echo CSR generated successfully
 
 REM Sign with CA
 echo [3/4] Signing certificate with CA...
-openssl x509 -req -days 10950 -in %SERVICE_NAME%.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out %SERVICE_NAME%.crt
+"%OPENSSL_CMD%" x509 -req -days 10950 -in %SERVICE_NAME%.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out %SERVICE_NAME%.crt
 if errorlevel 1 goto error
 echo Certificate signed successfully
 
