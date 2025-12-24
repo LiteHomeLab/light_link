@@ -1,5 +1,12 @@
 nul
 
+# NATS data directory
+data/jetstream/
+**/backups/
+
+# Test configs
+*-test.conf
+
 # IDE
 .vscode/
 .idea/
