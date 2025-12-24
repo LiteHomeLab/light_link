@@ -72,9 +72,10 @@ func CreateTLSOption(config *TLSConfig) (nats.Option, error) {
 
     // Create TLS config
     tlsConfig := &tls.Config{
-        Certificates: []tls.Certificate{cert},
-        RootCAs:      pool,
-        MinVersion:   tls.VersionTLS12,
+        Certificates:       []tls.Certificate{cert},
+        RootCAs:            pool,
+        MinVersion:         tls.VersionTLS12,
+        InsecureSkipVerify: true, // Skip hostname verification for IP addresses
     }
 
     return nats.Secure(tlsConfig), nil

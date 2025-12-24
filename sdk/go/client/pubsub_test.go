@@ -6,13 +6,18 @@ import (
 )
 
 func TestPublishSubscribe(t *testing.T) {
-    subClient, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    subClient, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
     defer subClient.Close()
 
-    pubClient, err := NewClient("nats://localhost:4222", nil)
+    pubClient, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -28,6 +33,9 @@ func TestPublishSubscribe(t *testing.T) {
         t.Fatalf("Subscribe failed: %v", err)
     }
     defer sub.Unsubscribe()
+
+    // Wait a bit for subscription to be fully established
+    time.Sleep(100 * time.Millisecond)
 
     // Publish
     err = pubClient.Publish("test.subject", map[string]interface{}{"msg": "hello"})

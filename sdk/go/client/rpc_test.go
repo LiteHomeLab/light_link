@@ -7,7 +7,12 @@ import (
 
 func TestCall(t *testing.T) {
     // This test requires a running NATS server and service
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -23,7 +28,12 @@ func TestCall(t *testing.T) {
 }
 
 func TestCallWithTimeout(t *testing.T) {
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }

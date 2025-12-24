@@ -6,7 +6,12 @@ import (
 )
 
 func TestSetGetState(t *testing.T) {
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server with JetStream:", err)
     }
@@ -30,7 +35,12 @@ func TestSetGetState(t *testing.T) {
 }
 
 func TestWatchState(t *testing.T) {
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server with JetStream:", err)
     }

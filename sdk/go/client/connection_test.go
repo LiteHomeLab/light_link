@@ -6,7 +6,12 @@ import (
 
 func TestNewClient(t *testing.T) {
     // Test creating client (requires NATS server running)
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -24,7 +29,7 @@ func TestNewClientWithTLS(t *testing.T) {
     }
 
     // Note: This test requires certificates to exist
-    client, err := NewClient("tls://localhost:4222", config)
+    client, err := NewClient("tls://172.18.200.47:4222", config)
     if err != nil {
         // Expected to fail without certificates, this is OK
         t.Logf("Expected failure without certs: %v", err)
@@ -35,7 +40,12 @@ func TestNewClientWithTLS(t *testing.T) {
 }
 
 func TestClientClose(t *testing.T) {
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -46,7 +56,12 @@ func TestClientClose(t *testing.T) {
 }
 
 func TestClientGetNATSConn(t *testing.T) {
-    client, err := NewClient("nats://localhost:4222", nil)
+    config := &TLSConfig{
+        CaFile:   "../../../deploy/nats/tls/ca.crt",
+        CertFile: "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+    }
+    client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
