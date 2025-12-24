@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>TextServiceDemo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\LightLink\LightLink.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NATS.Client" Version="1.1.1" />
+  </ItemGroup>
+
+</Project>

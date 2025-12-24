@@ -23,10 +23,12 @@ class Service:
     def __init__(
         self,
         name: str,
-        nats_url: str = "nats://localhost:4222"
+        nats_url: str = "nats://localhost:4222",
+        tls_config: Optional[dict] = None
     ):
         self.name = name
         self.nats_url = nats_url
+        self.tls_config = tls_config
         self.nc: Optional[NATSClient] = None
         self._rpc_handlers: Dict[str, RPCHandler] = {}
         self._method_metadata: Dict[str, MethodMetadata] = {}
@@ -59,7 +61,23 @@ class Service:
             raise RuntimeError("Service already running")
 
         self.nc = NATSClient()
-        await self.nc.connect(self.nats_url)
+
+        # Use TLS config if provided
+        if self.tls_config:
+            await self.nc.connect(
+                self.nats_url,
+                tls=self.tls_config,
+                connect_timeout=10,
+                reconnect_time_wait=2,
+                max_reconnect_attempts=5
+            )
+        else:
+            await self.nc.connect(
+                self.nats_url,
+                connect_timeout=10,
+                reconnect_time_wait=2,
+                max_reconnect_attempts=5
+            )
 
         subject = f"$SRV.{self.name}.>"
         await self.nc.subscribe(subject, cb=self._handle_rpc)
@@ -116,10 +134,43 @@ class Service:
         heartbeat = {
             "service": self.name,
             "version": "1.0.0",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         }
         subject = f"$LL.heartbeat.{self.name}"
         await self.nc.publish(subject, json.dumps(heartbeat).encode())
+
+    def build_current_metadata(
+        self,
+        version: str,
+        description: str,
+        author: str,
+        tags: list[str]
+    ) -> ServiceMetadata:
+        """构建当前服务的元数据"""
+        methods = list(self._method_metadata.values())
+
+        return ServiceMetadata(
+            name=self.name,
+            version=version,
+            description=description,
+            author=author,
+            tags=tags,
+            methods=methods,
+            registered_at=datetime.utcnow(),
+            last_seen=datetime.utcnow()
+        )
+
+    async def register_metadata(self, metadata: ServiceMetadata) -> None:
+        """注册服务元数据到 $LL.register.{service}"""
+        msg = {
+            "service": self.name,
+            "version": metadata.version,
+            "metadata": metadata.to_dict(),
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        }
+
+        subject = f"$LL.register.{self.name}"
+        await self.nc.publish(subject, json.dumps(msg).encode())
 
     async def stop(self) -> None:
         """停止服务"""

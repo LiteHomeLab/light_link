@@ -15,6 +15,7 @@ namespace LightLink
     {
         private readonly string _name;
         private readonly string _natsURL;
+        private readonly Options _natsOptions;
         private IConnection _nc;
         private readonly Dictionary<string, RPCHandler> _rpcHandlers;
         private readonly ReaderWriterLockSlim _rpcLock;
@@ -25,10 +26,15 @@ namespace LightLink
 
         private const int HeartbeatIntervalMs = 30000;
 
-        public Service(string name, string natsURL)
+        public Service(string name, string natsURL) : this(name, natsURL, null)
+        {
+        }
+
+        public Service(string name, string natsURL, Options natsOptions)
         {
             _name = name;
             _natsURL = natsURL;
+            _natsOptions = natsOptions;
             _rpcHandlers = new Dictionary<string, RPCHandler>();
             _methodMetadata = new Dictionary<string, MethodMetadata>();
             _rpcLock = new ReaderWriterLockSlim();
@@ -63,8 +69,8 @@ namespace LightLink
         {
             if (_running) throw new InvalidOperationException("Service already running");
 
-            var opts = ConnectionFactory.GetDefaultOptions();
-            opts.Url = _natsURL;
+            var opts = _natsOptions ?? ConnectionFactory.GetDefaultOptions();
+            if (opts.Url == null) opts.Url = _natsURL;
             opts.Name = $"LightLink Service: {_name}";
 
             _nc = new ConnectionFactory().CreateConnection(opts);
@@ -147,6 +153,56 @@ namespace LightLink
             _heartbeatTimer?.Dispose();
             _nc?.Close();
             _nc = null;
+        }
+
+        // BuildCurrentMetadata - builds metadata from registered methods
+        public ServiceMetadata BuildCurrentMetadata(
+            string version,
+            string description,
+            string author,
+            List<string> tags)
+        {
+            _metaLock.EnterReadLock();
+            try
+            {
+                var methods = new List<MethodMetadata>();
+                foreach (var meta in _methodMetadata.Values)
+                {
+                    methods.Add(meta);
+                }
+
+                return new ServiceMetadata
+                {
+                    Name = _name,
+                    Version = version,
+                    Description = description,
+                    Author = author,
+                    Tags = tags,
+                    Methods = methods,
+                    RegisteredAt = DateTime.UtcNow,
+                    LastSeen = DateTime.UtcNow
+                };
+            }
+            finally
+            {
+                _metaLock.ExitReadLock();
+            }
+        }
+
+        // RegisterMetadata - publish metadata to $LL.register.{service}
+        public void RegisterMetadata(ServiceMetadata metadata)
+        {
+            var msg = new
+            {
+                service = _name,
+                version = metadata.Version,
+                metadata = metadata,
+                timestamp = DateTime.UtcNow
+            };
+
+            string json = JsonSerializer.Serialize(msg);
+            byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
+            _nc.Publish($"$LL.register.{_name}", data);
         }
 
         public void Dispose()
