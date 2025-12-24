@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -114,8 +112,11 @@ func connectNATS(cfg *config.Config) (*nats.Conn, error) {
 	}
 
 	if cfg.NATS.TLS.Enabled {
-		opts = append(opts, nats.Secure())
-		// Note: For client certificates, you may need to use nats.RootCerts() and nats.ClientCert()
+		// Configure TLS with client certificate
+		opts = append(opts,
+			nats.RootCAs(cfg.NATS.TLS.CA),
+			nats.ClientCert(cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key),
+		)
 	}
 
 	return nats.Connect(cfg.NATS.URL, opts...)

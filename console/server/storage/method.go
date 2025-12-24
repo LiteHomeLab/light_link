@@ -11,16 +11,16 @@ import (
 
 // MethodMetadata represents method metadata in the database
 type MethodMetadata struct {
-	ID          int64                  `db:"id"`
-	ServiceID   int64                  `db:"service_id"`
-	Name        string                 `db:"name"`
-	Description string                 `db:"description"`
-	Params      []types.ParameterMetadata `db:"params"`
-	Returns     []types.ReturnMetadata   `db:"returns"`
-	Example     *types.ExampleMetadata   `db:"example"`
-	Tags        []string               `db:"tags"`
-	Deprecated  bool                   `db:"deprecated"`
-	CreatedAt   time.Time              `db:"created_at"`
+	ID          int64                  `db:"id" json:"id"`
+	ServiceID   int64                  `db:"service_id" json:"service_id"`
+	Name        string                 `db:"name" json:"name"`
+	Description string                 `db:"description" json:"description"`
+	Params      []types.ParameterMetadata `db:"params" json:"parameters"`
+	Returns     []types.ReturnMetadata   `db:"returns" json:"return_info"`
+	Example     *types.ExampleMetadata   `db:"example" json:"examples"`
+	Tags        []string               `db:"tags" json:"tags"`
+	Deprecated  bool                   `db:"deprecated" json:"deprecated"`
+	CreatedAt   time.Time              `db:"created_at" json:"created_at"`
 }
 
 // SaveMethod saves or updates a method
@@ -75,7 +75,7 @@ func (d *Database) GetMethods(serviceName string) ([]*MethodMetadata, error) {
 	}
 	defer rows.Close()
 
-	var methods []*MethodMetadata
+	methods := []*MethodMetadata{}
 	for rows.Next() {
 		var m MethodMetadata
 		var paramsJSON, returnsJSON, exampleJSON, tagsJSON string

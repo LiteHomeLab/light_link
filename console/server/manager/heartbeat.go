@@ -65,15 +65,17 @@ func (h *HeartbeatMonitor) Stop() {
 
 // handleHeartbeat handles a heartbeat message
 func (h *HeartbeatMonitor) handleHeartbeat(msg *nats.Msg) {
+	log.Printf("[Heartbeat] Received heartbeat from subject: %s", msg.Subject)
 	var heartbeat types.HeartbeatMessage
 	if err := json.Unmarshal(msg.Data, &heartbeat); err != nil {
 		log.Printf("[Heartbeat] Failed to unmarshal heartbeat: %v", err)
 		return
 	}
+	log.Printf("[Heartbeat] Service: %s, Version: %s", heartbeat.Service, heartbeat.Version)
 
 	// Update last seen time
 	h.mu.Lock()
-	wasOnline := h.lastSeen[heartbeat.Service].IsZero() || time.Since(h.lastSeen[heartbeat.Service]) < h.timeout
+	_ = h.lastSeen[heartbeat.Service].IsZero() || time.Since(h.lastSeen[heartbeat.Service]) < h.timeout
 	h.lastSeen[heartbeat.Service] = heartbeat.Timestamp
 	h.mu.Unlock()
 

@@ -7,13 +7,13 @@ import (
 
 // ServiceStatus represents the status of a service
 type ServiceStatus struct {
-	ID         int64     `db:"id"`
-	ServiceID  int64     `db:"service_id"`
-	ServiceName string   `db:"service_name"`
-	Online     bool      `db:"online"`
-	LastSeen   time.Time `db:"last_seen"`
-	Version    string    `db:"version"`
-	UpdatedAt  time.Time `db:"updated_at"`
+	ID         int64     `db:"id" json:"id"`
+	ServiceID  int64     `db:"service_id" json:"service_id"`
+	ServiceName string   `db:"service_name" json:"service_name"`
+	Online     bool      `db:"online" json:"online"`
+	LastSeen   time.Time `db:"last_seen" json:"last_seen"`
+	Version    string    `db:"version" json:"version"`
+	UpdatedAt  time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // UpdateServiceStatus updates the status of a service
@@ -82,7 +82,7 @@ func (d *Database) ListServiceStatus() ([]*ServiceStatus, error) {
 	}
 	defer rows.Close()
 
-	var statuses []*ServiceStatus
+	statuses := []*ServiceStatus{}
 	for rows.Next() {
 		var s ServiceStatus
 		if err := rows.Scan(&s.ID, &s.ServiceID, &s.ServiceName, &s.Online,

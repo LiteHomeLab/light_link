@@ -5,10 +5,7 @@ server:
 nats:
   url: "nats://localhost:4222"
   tls:
-    enabled: true
-    cert: "../../deploy/nats/tls/client-cert.pem"
-    key: "../../deploy/nats/tls/client-key.pem"
-    ca: "../../deploy/nats/tls/ca.pem"
+    enabled: false
 
 database:
   path: "data/light_link.db"

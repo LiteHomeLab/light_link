@@ -9,14 +9,14 @@ import (
 
 // ServiceMetadata represents service metadata in the database
 type ServiceMetadata struct {
-	ID           int64     `db:"id"`
-	Name         string    `db:"name"`
-	Version      string    `db:"version"`
-	Description  string    `db:"description"`
-	Author       string    `db:"author"`
-	Tags         []string  `db:"tags"`
-	RegisteredAt time.Time `db:"registered_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	ID           int64     `db:"id" json:"id"`
+	Name         string    `db:"name" json:"name"`
+	Version      string    `db:"version" json:"version"`
+	Description  string    `db:"description" json:"description"`
+	Author       string    `db:"author" json:"author"`
+	Tags         []string  `db:"tags" json:"tags"`
+	RegisteredAt time.Time `db:"registered_at" json:"registered_at"`
+	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // SaveService saves or updates a service
@@ -80,7 +80,7 @@ func (d *Database) ListServices() ([]*ServiceMetadata, error) {
 	}
 	defer rows.Close()
 
-	var services []*ServiceMetadata
+	services := []*ServiceMetadata{}
 	for rows.Next() {
 		var s ServiceMetadata
 		var tagsJSON string

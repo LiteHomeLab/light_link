@@ -36,14 +36,11 @@ func (h *Handler) Routes() http.Handler {
 
 	// Service endpoints
 	mux.HandleFunc("/api/services", h.withAuth(h.handleServices))
-	mux.HandleFunc("/api/services/", h.withAuth(h.handleServiceDetail))
+	mux.HandleFunc("/api/services/", h.withAuth(h.handleServiceRouter))
 
 	// Status endpoints
 	mux.HandleFunc("/api/status", h.withAuth(h.handleStatus))
 	mux.HandleFunc("/api/status/", h.withAuth(h.handleServiceStatus))
-
-	// Method endpoints
-	mux.HandleFunc("/api/services/", h.withAuth(h.handleMethods))
 
 	// Event endpoints
 	mux.HandleFunc("/api/events", h.withAuth(h.handleEvents))
@@ -123,6 +120,24 @@ func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, services)
+}
+
+// handleServiceRouter routes /api/services/ requests to appropriate handlers
+func (h *Handler) handleServiceRouter(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 {
+		sendJSONError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+
+	// Check if it's a methods request: /api/services/{service}/methods
+	if len(parts) >= 5 && parts[4] == "methods" {
+		h.handleMethods(w, r)
+		return
+	}
+
+	// Otherwise, it's a service detail request: /api/services/{service}
+	h.handleServiceDetail(w, r)
 }
 
 // handleServiceDetail handles service detail requests

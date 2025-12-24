@@ -27,6 +27,25 @@
           <el-input :value="methodName" disabled />
         </el-form-item>
 
+        <el-form-item label="方法描述" v-if="method && method.description">
+          <div class="method-description">{{ method.description }}</div>
+        </el-form-item>
+
+        <el-form-item label="方法参数" v-if="method && method.parameters && method.parameters.length">
+          <el-table :data="method.parameters" size="small" class="params-table">
+            <el-table-column prop="name" label="参数名" width="120" />
+            <el-table-column prop="type" label="类型" width="100" />
+            <el-table-column prop="description" label="描述" />
+            <el-table-column label="必填" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.required ? 'danger' : 'info'" size="small">
+                  {{ row.required ? '是' : '否' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-form-item>
+
         <el-form-item label="请求参数 (JSON)">
           <el-input
             v-model="paramsInput"
@@ -49,6 +68,15 @@
           <el-button @click="formatInput">
             <el-icon><MagicStick /></el-icon>
             格式化输入
+          </el-button>
+          <el-button
+            v-if="hasExample"
+            type="success"
+            @click="useFirstExample"
+            plain
+          >
+            <el-icon><DocumentCopy /></el-icon>
+            使用示例数据
           </el-button>
         </el-form-item>
       </el-form>
@@ -82,14 +110,14 @@
       </div>
     </el-card>
 
-    <el-card class="examples-card" v-if="method && method.examples && method.examples.length">
+    <el-card class="examples-card" v-if="method && method.examples">
       <template #header>
         <h3>示例</h3>
       </template>
 
       <div class="examples-list">
         <div
-          v-for="(example, index) in method.examples"
+          v-for="(example, index) in normalizedExamples"
           :key="index"
           class="example-item"
         >
@@ -114,12 +142,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Position,
   MagicStick,
-  Document
+  Document,
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import { servicesApi, callApi, type MethodMetadata, type CallResult } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -142,6 +171,45 @@ const serviceOnline = computed(() => {
   const status = servicesStore.servicesStatus.get(serviceName.value)
   return status?.online || false
 })
+
+const hasExample = computed(() => {
+  if (!method.value?.examples) return false
+  // Handle both array and object format
+  if (Array.isArray(method.value.examples)) {
+    return method.value.examples.length > 0
+  }
+  // Object format (single example)
+  return method.value.examples.input !== undefined
+})
+
+// Normalize examples to always be an array
+const normalizedExamples = computed(() => {
+  if (!method.value?.examples) return []
+
+  if (Array.isArray(method.value.examples)) {
+    return method.value.examples
+  }
+
+  // Object format - convert to array
+  if (method.value.examples.input !== undefined) {
+    return [method.value.examples]
+  }
+
+  return []
+})
+
+// Watch for method changes to auto-fill example data
+watch(method, (newMethod) => {
+  if (!newMethod || !newMethod.examples) return
+
+  if (Array.isArray(newMethod.examples) && newMethod.examples.length > 0) {
+    // Array format: use first example
+    useExample(newMethod.examples[0])
+  } else if (newMethod.examples.input !== undefined) {
+    // Object format: use the example directly
+    useExample(newMethod.examples)
+  }
+}, { immediate: true })
 
 function goBack() {
   router.push(`/services/${serviceName.value}`)
@@ -170,6 +238,17 @@ function useExample(example: any) {
   } else {
     paramsInput.value = '{\n  \n}'
   }
+}
+
+function useFirstExample() {
+  if (!method.value?.examples) return
+
+  if (Array.isArray(method.value.examples) && method.value.examples.length > 0) {
+    useExample(method.value.examples[0])
+  } else if (method.value.examples.input !== undefined) {
+    useExample(method.value.examples)
+  }
+  ElMessage.success('已加载示例数据')
 }
 
 async function handleCall() {
@@ -256,6 +335,16 @@ onMounted(() => {
 .duration {
   font-size: 14px;
   color: #666;
+}
+
+.method-description {
+  color: #333;
+  line-height: 1.6;
+  padding: 8px 0;
+}
+
+.params-table {
+  width: 100%;
 }
 
 .result-content {

@@ -6,12 +6,12 @@ import (
 
 // ServiceEvent represents a service event
 type ServiceEvent struct {
-	ID        int64     `db:"id"`
-	Type      string    `db:"type"`
-	Service   string    `db:"service"`
-	Method    string    `db:"method"`
-	Data      string    `db:"data"`
-	Timestamp time.Time `db:"timestamp"`
+	ID        int64     `db:"id" json:"id"`
+	Type      string    `db:"type" json:"type"`
+	Service   string    `db:"service" json:"service"`
+	Method    string    `db:"method" json:"method"`
+	Data      string    `db:"data" json:"data"`
+	Timestamp time.Time `db:"timestamp" json:"timestamp"`
 }
 
 // SaveEvent saves an event
@@ -40,7 +40,7 @@ func (d *Database) ListEvents(limit, offset int) ([]*ServiceEvent, error) {
 	}
 	defer rows.Close()
 
-	var events []*ServiceEvent
+	events := []*ServiceEvent{}
 	for rows.Next() {
 		var e ServiceEvent
 		if err := rows.Scan(&e.ID, &e.Type, &e.Service, &e.Method,
@@ -69,7 +69,7 @@ func (d *Database) ListEventsByType(eventType string, limit, offset int) ([]*Ser
 	}
 	defer rows.Close()
 
-	var events []*ServiceEvent
+	events := []*ServiceEvent{}
 	for rows.Next() {
 		var e ServiceEvent
 		if err := rows.Scan(&e.ID, &e.Type, &e.Service, &e.Method,
@@ -98,7 +98,7 @@ func (d *Database) ListEventsByService(serviceName string, limit, offset int) ([
 	}
 	defer rows.Close()
 
-	var events []*ServiceEvent
+	events := []*ServiceEvent{}
 	for rows.Next() {
 		var e ServiceEvent
 		if err := rows.Scan(&e.ID, &e.Type, &e.Service, &e.Method,

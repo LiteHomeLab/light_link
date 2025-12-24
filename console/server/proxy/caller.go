@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/LiteHomeLab/light_link/sdk/go/client"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 	"github.com/nats-io/nats.go"
 )

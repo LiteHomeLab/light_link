@@ -77,7 +77,7 @@ func (d *Database) ListUsers() ([]*User, error) {
 	}
 	defer rows.Close()
 
-	var users []*User
+	users := []*User{}
 	for rows.Next() {
 		var u User
 		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {

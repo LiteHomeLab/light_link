@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -21,6 +22,7 @@ type Client struct {
 	send     chan []byte
 	channels map[string]bool
 	hub      *Hub
+	mu       sync.RWMutex
 }
 
 // Message represents a WebSocket message
@@ -208,9 +210,6 @@ func (c *Client) writePump() {
 func (c *Client) done() chan struct{} {
 	return nil // TODO: Implement proper cleanup signal
 }
-
-// mu is a mutex for client operations
-var mu sync.Mutex
 
 // Close closes the client's connection
 func (c *Client) Close() {

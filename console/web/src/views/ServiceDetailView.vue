@@ -113,16 +113,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
-import { servicesApi, type ServiceMetadata, type MethodMetadata } from '@/api'
+import { servicesApi, type ServiceMetadata, type MethodMetadata, type ServiceStatus } from '@/api'
 import { ElMessage } from 'element-plus'
+import { useServicesStore } from '@/stores'
 
 const route = useRoute()
 const router = useRouter()
+const servicesStore = useServicesStore()
 
 const serviceName = computed(() => route.params.name as string)
 const service = ref<ServiceMetadata | null>(null)
 const methods = ref<MethodMetadata[]>([])
-const serviceStatus = ref<any>(null)
+const serviceStatus = ref<ServiceStatus | null>(null)
 const loading = ref(false)
 
 function goBack() {
@@ -157,6 +159,10 @@ async function loadData() {
 
     // Get methods for this service
     methods.value = await servicesApi.getMethods(serviceName.value)
+
+    // Get service status from store
+    await servicesStore.loadStatus()
+    serviceStatus.value = servicesStore.getServiceStatus(serviceName.value) || null
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '加载失败')
   } finally {
