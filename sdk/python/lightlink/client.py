@@ -9,10 +9,11 @@ from nats.errors import TimeoutError, NotFoundError, BadRequestError
 
 class TLSConfig:
     """TLS configuration"""
-    def __init__(self, ca_file, cert_file, key_file):
+    def __init__(self, ca_file, cert_file, key_file, server_name=None):
         self.ca_file = ca_file
         self.cert_file = cert_file
         self.key_file = key_file
+        self.server_name = server_name
 
 
 class Client:
@@ -43,6 +44,8 @@ class Client:
                 keyfile=self.tls_config.key_file
             )
             ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            if self.tls_config.server_name:
+                ssl_ctx.server_hostname = self.tls_config.server_name
             options["tls"] = ssl_ctx
 
         await self.nc.connect(self.url, **options)
