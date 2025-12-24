@@ -26,9 +26,10 @@ light_link/
 ├── examples/            # SDK 基础功能示例
 ├── light_link_platform/ # 管理平台和多语言示例服务
 │   ├── manager_base/    # 管理平台 (server + web)
-│   ├── go/              # Go 示例服务
-│   ├── csharp/          # C# 示例服务
-│   └── python/          # Python 示例服务
+│   └── examples/        # 多语言示例服务
+│       ├── go/          # Go 示例服务
+│       ├── csharp/      # C# 示例服务
+│       └── python/      # Python 示例服务
 └── docs/                # 文档
 ```
 
@@ -43,9 +44,10 @@ light_link/
 7. 所有测试必须通过后才能提交
 8. **平台示例管理**: 所有管理平台和多语言示例服务统一放在 `light_link_platform/` 目录下
    - `manager_base/` - 管理平台（后端 + 前端在一个文件夹）
-   - `go/` - Go 示例服务
-   - `csharp/` - C# 示例服务
-   - `python/` - Python 示例服务
+   - `examples/` - 多语言示例服务
+     - `go/` - Go 示例服务
+     - `csharp/` - C# 示例服务
+     - `python/` - Python 示例服务
    - 新增示例服务时，请放入对应的语言子目录
 
 ## NATS 服务配置
@@ -94,14 +96,14 @@ go run main.go
 # 访问 http://localhost:8080
 
 # 启动 Go 示例服务
-cd light_link_platform/go/metadata-demo
+cd light_link_platform/examples/go/metadata-demo
 go run main.go
 
 # 启动 C# 示例服务
-cd light_link_platform/csharp/TextServiceDemo
+cd light_link_platform/examples/csharp/TextServiceDemo
 dotnet run
 
 # 启动 Python 示例服务
-cd light_link_platform/python
+cd light_link_platform/examples/python
 python data_service.py
 ```
