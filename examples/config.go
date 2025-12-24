@@ -11,7 +11,7 @@ type Config struct {
 func GetConfig() *Config {
     url := os.Getenv("NATS_URL")
     if url == "" {
-        url = "nats://localhost:4222"
+        url = "nats://172.18.200.47:4222"
     }
     return &Config{
         NATSURL: url,
