@@ -8,9 +8,10 @@ import (
 
 func TestWatchStateCleanup(t *testing.T) {
 	config := &TLSConfig{
-		CaFile:   "../../../deploy/nats/tls/ca.crt",
-		CertFile: "../../../deploy/nats/tls/demo-service.crt",
-		KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+		CaFile:     "../../../deploy/nats/tls/ca.crt",
+		CertFile:   "../../../deploy/nats/tls/demo-service.crt",
+		KeyFile:    "../../../deploy/nats/tls/demo-service.key",
+		ServerName: "nats-server",
 	}
 	client, err := NewClient("nats://172.18.200.47:4222", config)
 	if err != nil {

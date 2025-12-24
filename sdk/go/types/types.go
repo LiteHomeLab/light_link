@@ -47,7 +47,8 @@ type Config struct {
 }
 
 type TLSConfig struct {
-    CaFile   string `json:"ca_file"`
-    CertFile string `json:"cert_file"`
-    KeyFile  string `json:"key_file"`
+    CaFile     string `json:"ca_file"`
+    CertFile   string `json:"cert_file"`
+    KeyFile    string `json:"key_file"`
+    ServerName string `json:"server_name,omitempty"`
 }

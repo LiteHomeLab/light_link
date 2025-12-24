@@ -11,9 +11,10 @@ import (
 
 // TLSConfig TLS configuration
 type TLSConfig struct {
-    CaFile   string
-    CertFile string
-    KeyFile  string
+    CaFile     string
+    CertFile   string
+    KeyFile    string
+    ServerName string
 }
 
 // Client represents a NATS client
@@ -72,10 +73,10 @@ func CreateTLSOption(config *TLSConfig) (nats.Option, error) {
 
     // Create TLS config
     tlsConfig := &tls.Config{
-        Certificates:       []tls.Certificate{cert},
-        RootCAs:            pool,
-        MinVersion:         tls.VersionTLS12,
-        InsecureSkipVerify: true, // Skip hostname verification for IP addresses
+        Certificates: []tls.Certificate{cert},
+        RootCAs:      pool,
+        MinVersion:   tls.VersionTLS12,
+        ServerName:   config.ServerName,
     }
 
     return nats.Secure(tlsConfig), nil

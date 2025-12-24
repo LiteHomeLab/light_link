@@ -7,9 +7,10 @@ import (
 func TestNewClient(t *testing.T) {
     // Test creating client (requires NATS server running)
     config := &TLSConfig{
-        CaFile:   "../../../deploy/nats/tls/ca.crt",
-        CertFile: "../../../deploy/nats/tls/demo-service.crt",
-        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+        CaFile:     "../../../deploy/nats/tls/ca.crt",
+        CertFile:   "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:    "../../../deploy/nats/tls/demo-service.key",
+        ServerName: "nats-server",
     }
     client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
@@ -23,9 +24,10 @@ func TestNewClient(t *testing.T) {
 
 func TestNewClientWithTLS(t *testing.T) {
     config := &TLSConfig{
-        CaFile:   "../../deploy/nats/tls/ca.crt",
-        CertFile: "../../deploy/nats/tls/user-service.crt",
-        KeyFile:  "../../deploy/nats/tls/user-service.key",
+        CaFile:     "../../deploy/nats/tls/ca.crt",
+        CertFile:   "../../deploy/nats/tls/user-service.crt",
+        KeyFile:    "../../deploy/nats/tls/user-service.key",
+        ServerName: "nats-server",
     }
 
     // Note: This test requires certificates to exist
@@ -41,9 +43,10 @@ func TestNewClientWithTLS(t *testing.T) {
 
 func TestClientClose(t *testing.T) {
     config := &TLSConfig{
-        CaFile:   "../../../deploy/nats/tls/ca.crt",
-        CertFile: "../../../deploy/nats/tls/demo-service.crt",
-        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+        CaFile:     "../../../deploy/nats/tls/ca.crt",
+        CertFile:   "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:    "../../../deploy/nats/tls/demo-service.key",
+        ServerName: "nats-server",
     }
     client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
@@ -57,9 +60,10 @@ func TestClientClose(t *testing.T) {
 
 func TestClientGetNATSConn(t *testing.T) {
     config := &TLSConfig{
-        CaFile:   "../../../deploy/nats/tls/ca.crt",
-        CertFile: "../../../deploy/nats/tls/demo-service.crt",
-        KeyFile:  "../../../deploy/nats/tls/demo-service.key",
+        CaFile:     "../../../deploy/nats/tls/ca.crt",
+        CertFile:   "../../../deploy/nats/tls/demo-service.crt",
+        KeyFile:    "../../../deploy/nats/tls/demo-service.key",
+        ServerName: "nats-server",
     }
     client, err := NewClient("nats://172.18.200.47:4222", config)
     if err != nil {
