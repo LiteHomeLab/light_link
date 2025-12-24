@@ -15,6 +15,11 @@ namespace TextServiceDemo
 
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = "nats://localhost:4222";
+            opts.Name = "C# Text Service";
+            opts.ReconnectWait = 2000;
+            opts.MaxReconnect = 10;
+            opts.PingInterval = 20000;
+            opts.Timeout = 10000;
 
             var svc = new Service("csharp-text-service", "nats://localhost:4222", opts);
 
