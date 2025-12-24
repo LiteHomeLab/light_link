@@ -1,0 +1,13 @@
+# LightLink Certificate Manifest
+# Format: <service-name>: <client-distribution-path>
+
+# NATS Server (server-side only, no client package)
+nats-server: server.crt, server.key
+
+# Demo Services
+demo-service: clients/demo-service
+test-service: clients/test-service
+client-app: clients/client-app
+
+# Manager Services
+manager: clients/manager
