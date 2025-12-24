@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LiteHomeLab/light_link/console/server/proxy"
 	"github.com/LiteHomeLab/light_link/console/server/storage"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 	"github.com/nats-io/nats.go"
@@ -16,6 +17,7 @@ type Manager struct {
 	nc       *nats.Conn
 	registry *Registry
 	monitor  *HeartbeatMonitor
+	caller   *proxy.Caller
 	eventCh  chan *types.ServiceEvent
 	mu       sync.RWMutex
 	stopCh   chan struct{}
@@ -26,6 +28,7 @@ func NewManager(db *storage.Database, nc *nats.Conn, heartbeatTimeout time.Durat
 	return &Manager{
 		db:      db,
 		nc:      nc,
+		caller:  proxy.NewCaller(nc, 30*time.Second),
 		eventCh: make(chan *types.ServiceEvent, 100),
 		stopCh:  make(chan struct{}),
 	}
@@ -180,4 +183,14 @@ func (m *Manager) GetServiceMethods(serviceName string) ([]*storage.MethodMetada
 // GetServiceMethod returns a specific method
 func (m *Manager) GetServiceMethod(serviceName, methodName string) (*storage.MethodMetadata, error) {
 	return m.db.GetMethod(serviceName, methodName)
+}
+
+// CallServiceMethod calls an RPC method on a service
+func (m *Manager) CallServiceMethod(serviceName, methodName string, params map[string]interface{}) (*proxy.CallResult, error) {
+	return m.caller.Call(serviceName, methodName, params)
+}
+
+// GetCaller returns the RPC caller instance
+func (m *Manager) GetCaller() *proxy.Caller {
+	return m.caller
 }

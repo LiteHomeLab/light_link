@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -62,9 +63,12 @@ func (d *Database) GetServiceStatus(serviceName string) (*ServiceStatus, error) 
 	err := row.Scan(&s.ID, &s.ServiceID, &s.ServiceName, &s.Online,
 		&s.LastSeen, &s.Version, &s.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, nil // Service not found, not an error
+		return nil, fmt.Errorf("service status not found: %s", serviceName)
 	}
-	return &s, err
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 // ListServiceStatus retrieves all service statuses

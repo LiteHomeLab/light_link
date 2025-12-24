@@ -19,9 +19,9 @@ type Caller struct {
 // CallResult represents the result of an RPC call
 type CallResult struct {
 	Success    bool                   `json:"success"`
-	Result     map[string]interface{} `json:"result,omitempty"`
+	Data       map[string]interface{} `json:"data,omitempty"`
 	Error      string                 `json:"error,omitempty"`
-	DurationMs int64                  `json:"durationMs"`
+	Duration   int64                  `json:"duration"`
 }
 
 // NewCaller creates a new RPC caller
@@ -56,9 +56,9 @@ func (c *Caller) Call(serviceName, methodName string, params map[string]interfac
 	respMsg, err := c.nc.Request(subject, requestData, c.timeout)
 	if err != nil {
 		return &CallResult{
-			Success:    false,
-			Error:      err.Error(),
-			DurationMs: time.Since(start).Milliseconds(),
+			Success:  false,
+			Error:    err.Error(),
+			Duration: time.Since(start).Milliseconds(),
 		}, nil
 	}
 
@@ -66,17 +66,17 @@ func (c *Caller) Call(serviceName, methodName string, params map[string]interfac
 	var response types.RPCResponse
 	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return &CallResult{
-			Success:    false,
-			Error:      fmt.Sprintf("parse response: %v", err),
-			DurationMs: time.Since(start).Milliseconds(),
+			Success:  false,
+			Error:    fmt.Sprintf("parse response: %v", err),
+			Duration: time.Since(start).Milliseconds(),
 		}, nil
 	}
 
 	return &CallResult{
-		Success:    response.Success,
-		Result:     response.Result,
-		Error:      response.Error,
-		DurationMs: time.Since(start).Milliseconds(),
+		Success:  response.Success,
+		Data:     response.Result,
+		Error:    response.Error,
+		Duration: time.Since(start).Milliseconds(),
 	}, nil
 }
 
@@ -99,26 +99,26 @@ func (c *Caller) CallWithTimeout(serviceName, methodName string, params map[stri
 	respMsg, err := c.nc.Request(subject, requestData, timeout)
 	if err != nil {
 		return &CallResult{
-			Success:    false,
-			Error:      err.Error(),
-			DurationMs: time.Since(start).Milliseconds(),
+			Success:  false,
+			Error:    err.Error(),
+			Duration: time.Since(start).Milliseconds(),
 		}, nil
 	}
 
 	var response types.RPCResponse
 	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return &CallResult{
-			Success:    false,
-			Error:      fmt.Sprintf("parse response: %v", err),
-			DurationMs: time.Since(start).Milliseconds(),
+			Success:  false,
+			Error:    fmt.Sprintf("parse response: %v", err),
+			Duration: time.Since(start).Milliseconds(),
 		}, nil
 	}
 
 	return &CallResult{
-		Success:    response.Success,
-		Result:     response.Result,
-		Error:      response.Error,
-		DurationMs: time.Since(start).Milliseconds(),
+		Success:  response.Success,
+		Data:     response.Result,
+		Error:    response.Error,
+		Duration: time.Since(start).Milliseconds(),
 	}, nil
 }
 

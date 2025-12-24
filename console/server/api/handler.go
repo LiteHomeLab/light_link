@@ -305,12 +305,26 @@ func (h *Handler) handleCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual RPC call via NATS
-	// For now, return a mock response
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": false,
-		"error":   "RPC call not yet implemented - use NATS client directly",
-	})
+	// Check if service is online
+	status, err := h.db.GetServiceStatus(req.Service)
+	if err != nil {
+		sendJSONError(w, http.StatusServiceUnavailable, "Service not found")
+		return
+	}
+	if !status.Online {
+		sendJSONError(w, http.StatusServiceUnavailable, "Service is offline")
+		return
+	}
+
+	// Make the RPC call
+	result, err := h.manager.CallServiceMethod(req.Service, req.Method, req.Params)
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Return the result
+	json.NewEncoder(w).Encode(result)
 }
 
 // handleWebSocket handles WebSocket connections
