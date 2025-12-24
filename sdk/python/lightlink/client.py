@@ -17,7 +17,7 @@ class TLSConfig:
 
 class Client:
     """LightLink Python Client"""
-    def __init__(self, url="nats://localhost:4222", tls_config=None):
+    def __init__(self, url="nats://172.18.200.47:4222", tls_config=None):
         self.url = url
         self.tls_config = tls_config
         self.nc = None
