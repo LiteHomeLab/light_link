@@ -126,35 +126,27 @@ echo Default client certificates created
 echo.
 
 REM ========================================
-REM Step 5: Create Client Distribution Packages
+REM Step 5: Create Client Distribution Package
 REM ========================================
 
-echo [Step 5/6] Creating Client Distribution Packages...
+echo [Step 5/6] Creating Client Distribution Package...
 
-if not exist "clients" mkdir clients
+if not exist "client" mkdir client
 
-REM Create package for demo-service
-echo   - Creating package for demo-service...
-if not exist "clients\demo-service" mkdir clients\demo-service
-copy /Y ca.crt clients\demo-service\ >nul
-copy /Y demo-service.crt clients\demo-service\ >nul
-copy /Y demo-service.key clients\demo-service\ >nul
+REM Copy CA certificate
+echo   - Copying CA certificate...
+copy /Y ca.crt client\ >nul
 
-REM Create package for test-service
-echo   - Creating package for test-service...
-if not exist "clients\test-service" mkdir clients\test-service
-copy /Y ca.crt clients\test-service\ >nul
-copy /Y test-service.crt clients\test-service\ >nul
-copy /Y test-service.key clients\test-service\ >nul
+REM Copy default client certificates
+echo   - Copying client certificates...
+copy /Y demo-service.crt client\ >nul
+copy /Y demo-service.key client\ >nul
+copy /Y test-service.crt client\ >nul
+copy /Y test-service.key client\ >nul
+copy /Y client-app.crt client\ >nul
+copy /Y client-app.key client\ >nul
 
-REM Create package for client-app
-echo   - Creating package for client-app...
-if not exist "clients\client-app" mkdir clients\client-app
-copy /Y ca.crt clients\client-app\ >nul
-copy /Y client-app.crt clients\client-app\ >nul
-copy /Y client-app.key clients\client-app\ >nul
-
-echo Client packages created in clients/ directory
+echo Client package created in client/ directory
 echo.
 
 REM ========================================
@@ -163,55 +155,50 @@ REM ========================================
 
 echo [Step 6/6] Generating documentation...
 
-REM Generate README for each client package
-for %%s in (demo-service test-service client-app) do (
-    echo # TLS Certificate Package for %%s > clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo ## Deployment >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo Copy all files in this folder to your service directory: >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo ```batch >> clients\%%s\README.md
-    echo mkdir tls >> clients\%%s\README.md
-    echo copy *.* tls\ >> clients\%%s\README.md
-    echo ``` >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo ## Configuration (Default Paths) >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo After copying to tls/ directory, use these default paths: >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo ### Go SDK >> clients\%%s\README.md
-    echo ```go >> clients\%%s\README.md
-    echo tlsConfig := ^&client.TLSConfig{ >> clients\%%s\README.md
-    echo     CaFile:     "tls/ca.crt", >> clients\%%s\README.md
-    echo     CertFile:   "tls/%%s.crt", >> clients\%%s\README.md
-    echo     KeyFile:    "tls/%%s.key", >> clients\%%s\README.md
-    echo     ServerName: "nats-server", >> clients\%%s\README.md
-    echo } >> clients\%%s\README.md
-    echo ``` >> clients\%%s\README.md
-    echo. >> clients\%%s\README.md
-    echo ### Python SDK >> clients\%%s\README.md
-    echo ```python >> clients\%%s\README.md
-    echo tls_config = TLSConfig( >> clients\%%s\README.md
-    echo     ca_file="tls/ca.crt", >> clients\%%s\README.md
-    echo     cert_file="tls/%%s.crt", >> clients\%%s\README.md
-    echo     key_file="tls/%%s.key", >> clients\%%s\README.md
-    echo     server_name="nats-server" >> clients\%%s\README.md
-    echo ) >> clients\%%s\README.md
-    echo ``` >> clients\%%s\README.md
-)
-
-REM Create certificate manifest
-echo # LightLink Certificate Manifest > cert-manifest.txt
-echo # Auto-generated on %date% %time% >> cert-manifest.txt
-echo. >> cert-manifest.txt
-echo ## NATS Server (server-side only) >> cert-manifest.txt
-echo nats-server: server.crt, server.key >> cert-manifest.txt
-echo. >> cert-manifest.txt
-echo ## Client Distribution Packages >> cert-manifest.txt
-echo demo-service: clients/demo-service/ >> cert-manifest.txt
-echo test-service: clients/test-service/ >> cert-manifest.txt
-echo client-app: clients/client-app/ >> cert-manifest.txt
+REM Generate README for client package
+echo # LightLink Client Certificate Package > client\README.md
+echo. >> client\README.md
+echo Generated: %date% %time% >> client\README.md
+echo. >> client\README.md
+echo ## Files >> client\README.md
+echo. >> client\README.md
+echo - ca.crt - CA Root Certificate (trusted by all clients) >> client\README.md
+echo. >> client\README.md
+echo Default client certificates: >> client\README.md
+echo - demo-service.crt / demo-service.key >> client\README.md
+echo - test-service.crt / test-service.key >> client\README.md
+echo - client-app.crt / client-app.key >> client\README.md
+echo. >> client\README.md
+echo ## Deployment >> client\README.md
+echo. >> client\README.md
+echo 1. Copy this entire client/ folder to your service directory >> client\README.md
+echo 2. Use the certificate files for your service >> client\README.md
+echo. >> client\README.md
+echo ## Configuration Examples >> client\README.md
+echo. >> client\README.md
+echo ### For demo-service (Go SDK) >> client\README.md
+echo ```go >> client\README.md
+echo tlsConfig := ^&client.TLSConfig{ >> client\README.md
+echo     CaFile:     "client/ca.crt", >> client\README.md
+echo     CertFile:   "client/demo-service.crt", >> client\README.md
+echo     KeyFile:    "client/demo-service.key", >> client\README.md
+echo     ServerName: "nats-server", >> client\README.md
+echo } >> client\README.md
+echo ``` >> client\README.md
+echo. >> client\README.md
+echo ### For test-service (Python SDK) >> client\README.md
+echo ```python >> client\README.md
+echo tls_config = TLSConfig( >> client\README.md
+echo     ca_file="client/ca.crt", >> client\README.md
+echo     cert_file="client/test-service.crt", >> client\README.md
+echo     key_file="client/test-service.key", >> client\README.md
+echo     server_name="nats-server" >> client\README.md
+echo ) >> client\README.md
+echo ``` >> client\README.md
+echo. >> client\README.md
+echo ## Security Notice >> client\README.md
+echo - Keep .key files secure and private! >> client\README.md
+echo - Do not commit .key files to version control >> client\README.md
 
 echo Documentation created
 echo.
@@ -240,16 +227,13 @@ echo   - demo-service.key, demo-service.crt
 echo   - test-service.key, test-service.crt
 echo   - client-app.key, client-app.crt
 echo.
-echo Client Distribution Packages (ready to deploy):
-echo   - clients\demo-service\
-echo   - clients\test-service\
-echo   - clients\client-app\
-echo.
-echo Each package contains:
-echo   - ca.crt
-echo   - {service}.crt
-echo   - {service}.key
-echo   - README.md
+echo Client Package (ready to deploy):
+echo   - client\ (directory)
+echo     - ca.crt
+echo     - demo-service.crt, demo-service.key
+echo     - test-service.crt, test-service.key
+echo     - client-app.crt, client-app.key
+echo     - README.md
 echo.
 echo ========================================
 echo Deployment Instructions
@@ -259,16 +243,15 @@ echo 1. NATS Server Configuration:
 echo    Use: server.crt, server.key, ca.crt
 echo.
 echo 2. Client Services:
-echo    Copy the entire client package folder to your service:
+echo    Copy the entire client/ folder to your service directory:
 echo.
-echo    For example, to deploy demo-service:
-echo      xcopy /E /I clients\demo-service your-service\tls\
+echo    xcopy /E /I client your-service-directory\
 echo.
-echo 3. Then use default tls/ paths in your service config:
-echo    ca: tls/ca.crt
-echo    cert: tls/demo-service.crt
-echo    key: tls/demo-service.key
-echo    server_name: nats-server
+echo    Then configure your service to use the certificate files:
+echo      ca: client/ca.crt
+echo      cert: client/demo-service.crt (or your service)
+echo      key: client/demo-service.key (or your service)
+echo      server_name: nats-server
 echo.
 echo To generate additional client certificates:
 echo    generate-service-cert.bat your-service-name

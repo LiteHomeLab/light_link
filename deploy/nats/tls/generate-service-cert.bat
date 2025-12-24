@@ -104,70 +104,19 @@ echo Cleaning up temporary files...
 del %SERVICE_NAME%.csr 2>nul
 del ca.srl 2>nul
 
-REM Create client distribution directory
-echo [4/4] Creating client distribution package...
-if not exist "clients" mkdir clients
-if not exist "clients\%SERVICE_NAME%" mkdir clients\%SERVICE_NAME%
+REM Add to client directory
+echo [4/4] Adding certificate to client package...
+if not exist "client" mkdir client
 
-REM Copy files to client distribution directory
-copy /Y ca.crt clients\%SERVICE_NAME%\ >nul
-copy /Y %SERVICE_NAME%.crt clients\%SERVICE_NAME%\ >nul
-copy /Y %SERVICE_NAME%.key clients\%SERVICE_NAME%\ >nul
-echo Client package created: clients\%SERVICE_NAME%\
+REM Ensure ca.crt exists in client directory
+if not exist "client\ca.crt" (
+    copy /Y ca.crt client\ >nul
+)
 
-REM Generate README for client
-echo # TLS Certificate Package for %SERVICE_NAME% > clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo Generated: %date% %time% >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ## Files >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo - ca.crt - CA Root Certificate (trusted certificate) >> clients\%SERVICE_NAME%\README.md
-echo - %SERVICE_NAME%.crt - Service Certificate >> clients\%SERVICE_NAME%\README.md
-echo - %SERVICE_NAME%.key - Service Private Key (KEEP SECRET!) >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ## Deployment >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo Copy all files in this folder to your service directory: >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ```bash >> clients\%SERVICE_NAME%\README.md
-echo # Copy to service directory >> clients\%SERVICE_NAME%\README.md
-echo mkdir tls >> clients\%SERVICE_NAME%\README.md
-echo copy *.* tls\ >> clients\%SERVICE_NAME%\README.md
-echo ``` >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ## Configuration (Default Paths) >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo After copying to tls/ directory, use these default paths: >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ### Go SDK >> clients\%SERVICE_NAME%\README.md
-echo ```go >> clients\%SERVICE_NAME%\README.md
-echo tlsConfig := ^&client.TLSConfig{ >> clients\%SERVICE_NAME%\README.md
-echo     CaFile:     "tls/ca.crt", >> clients\%SERVICE_NAME%\README.md
-echo     CertFile:   "tls/%SERVICE_NAME%.crt", >> clients\%SERVICE_NAME%\README.md
-echo     KeyFile:    "tls/%SERVICE_NAME%.key", >> clients\%SERVICE_NAME%\README.md
-echo     ServerName: "nats-server", >> clients\%SERVICE_NAME%\README.md
-echo } >> clients\%SERVICE_NAME%\README.md
-echo ``` >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ### Python SDK >> clients\%SERVICE_NAME%\README.md
-echo ```python >> clients\%SERVICE_NAME%\README.md
-echo tls_config = TLSConfig( >> clients\%SERVICE_NAME%\README.md
-echo     ca_file="tls/ca.crt", >> clients\%SERVICE_NAME%\README.md
-echo     cert_file="tls/%SERVICE_NAME%.crt", >> clients\%SERVICE_NAME%\README.md
-echo     key_file="tls/%SERVICE_NAME%.key", >> clients\%SERVICE_NAME%\README.md
-echo     server_name="nats-server" >> clients\%SERVICE_NAME%\README.md
-echo ) >> clients\%SERVICE_NAME%\README.md
-echo ``` >> clients\%SERVICE_NAME%\README.md
-echo. >> clients\%SERVICE_NAME%\README.md
-echo ### Environment Variables (Optional) >> clients\%SERVICE_NAME%\README.md
-echo ```bash >> clients\%SERVICE_NAME%\README.md
-echo set NATS_URL=tls://172.18.200.47:4222 >> clients\%SERVICE_NAME%\README.md
-echo set TLS_CA=tls/ca.crt >> clients\%SERVICE_NAME%\README.md
-echo set TLS_CERT=tls/%SERVICE_NAME%.crt >> clients\%SERVICE_NAME%\README.md
-echo set TLS_KEY=tls/%SERVICE_NAME%.key >> clients\%SERVICE_NAME%\README.md
-echo set TLS_SERVER_NAME=nats-server >> clients\%SERVICE_NAME%\README.md
-echo ``` >> clients\%SERVICE_NAME%\README.md
+REM Copy service certificate to client directory
+copy /Y %SERVICE_NAME%.crt client\ >nul
+copy /Y %SERVICE_NAME%.key client\ >nul
+echo Certificate added to client\ directory
 
 echo.
 echo ========================================
@@ -178,26 +127,28 @@ echo Generated files in current directory:
 echo - %SERVICE_NAME%.key (Private Key - KEEP SECRET!)
 echo - %SERVICE_NAME%.crt (Certificate)
 echo.
-echo Client distribution package: clients\%SERVICE_NAME%\
-echo   - ca.crt
-echo   - %SERVICE_NAME%.crt
-echo   - %SERVICE_NAME%.key
-echo   - README.md
+echo Files added to client\ directory:
+echo - ca.crt
+echo - %SERVICE_NAME%.crt
+echo - %SERVICE_NAME%.key
 echo.
 echo To deploy:
-echo   1. Copy clients\%SERVICE_NAME%\* to your service directory\tls\
-echo   2. Use default paths: tls/ca.crt, tls/%SERVICE_NAME%.crt, tls/%SERVICE_NAME%.key
-echo   3. Set ServerName to "nats-server" for certificate verification
+echo   1. Copy the entire client\ folder to your service directory
+echo   2. Configure your service to use:
+echo      ca: client/ca.crt
+echo      cert: client/%SERVICE_NAME%.crt
+echo      key: client/%SERVICE_NAME%.key
+echo      server_name: nats-server
 echo.
 
 REM Append to manifest
 if exist cert-manifest.txt (
-    echo %SERVICE_NAME%: clients\%SERVICE_NAME% >> cert-manifest.txt
+    echo %SERVICE_NAME%: client/%SERVICE_NAME%.crt, %SERVICE_NAME%.key >> cert-manifest.txt
 ) else (
     echo # LightLink Certificate Manifest >> cert-manifest.txt
-    echo # Format: ^<service-name^>: ^<client-distribution-path^> >> cert-manifest.txt
+    echo # Format: ^<service-name^>: ^<cert-file^>, ^<key-file^> >> cert-manifest.txt
     echo. >> cert-manifest.txt
-    echo %SERVICE_NAME%: clients\%SERVICE_NAME% >> cert-manifest.txt
+    echo %SERVICE_NAME%: client/%SERVICE_NAME%.crt, %SERVICE_NAME%.key >> cert-manifest.txt
 )
 
 goto end
