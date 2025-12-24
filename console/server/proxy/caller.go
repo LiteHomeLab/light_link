@@ -1,0 +1,142 @@
+package proxy
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/LiteHomeLab/light_link/sdk/go/client"
+	"github.com/LiteHomeLab/light_link/sdk/go/types"
+	"github.com/nats-io/nats.go"
+)
+
+// Caller handles RPC calls to services
+type Caller struct {
+	nc      *nats.Conn
+	timeout time.Duration
+}
+
+// CallResult represents the result of an RPC call
+type CallResult struct {
+	Success    bool                   `json:"success"`
+	Result     map[string]interface{} `json:"result,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+	DurationMs int64                  `json:"durationMs"`
+}
+
+// NewCaller creates a new RPC caller
+func NewCaller(nc *nats.Conn, timeout time.Duration) *Caller {
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	return &Caller{
+		nc:      nc,
+		timeout: timeout,
+	}
+}
+
+// Call calls an RPC method on a service
+func (c *Caller) Call(serviceName, methodName string, params map[string]interface{}) (*CallResult, error) {
+	start := time.Now()
+
+	// Build RPC request
+	request := types.RPCRequest{
+		ID:     generateID(),
+		Method: methodName,
+		Args:   params,
+	}
+
+	requestData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	// Send request to service
+	subject := fmt.Sprintf("$SRV.%s.%s", serviceName, methodName)
+	respMsg, err := c.nc.Request(subject, requestData, c.timeout)
+	if err != nil {
+		return &CallResult{
+			Success:    false,
+			Error:      err.Error(),
+			DurationMs: time.Since(start).Milliseconds(),
+		}, nil
+	}
+
+	// Parse response
+	var response types.RPCResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return &CallResult{
+			Success:    false,
+			Error:      fmt.Sprintf("parse response: %v", err),
+			DurationMs: time.Since(start).Milliseconds(),
+		}, nil
+	}
+
+	return &CallResult{
+		Success:    response.Success,
+		Result:     response.Result,
+		Error:      response.Error,
+		DurationMs: time.Since(start).Milliseconds(),
+	}, nil
+}
+
+// CallWithTimeout calls an RPC method with a custom timeout
+func (c *Caller) CallWithTimeout(serviceName, methodName string, params map[string]interface{}, timeout time.Duration) (*CallResult, error) {
+	start := time.Now()
+
+	request := types.RPCRequest{
+		ID:     generateID(),
+		Method: methodName,
+		Args:   params,
+	}
+
+	requestData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	subject := fmt.Sprintf("$SRV.%s.%s", serviceName, methodName)
+	respMsg, err := c.nc.Request(subject, requestData, timeout)
+	if err != nil {
+		return &CallResult{
+			Success:    false,
+			Error:      err.Error(),
+			DurationMs: time.Since(start).Milliseconds(),
+		}, nil
+	}
+
+	var response types.RPCResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return &CallResult{
+			Success:    false,
+			Error:      fmt.Sprintf("parse response: %v", err),
+			DurationMs: time.Since(start).Milliseconds(),
+		}, nil
+	}
+
+	return &CallResult{
+		Success:    response.Success,
+		Result:     response.Result,
+		Error:      response.Error,
+		DurationMs: time.Since(start).Milliseconds(),
+	}, nil
+}
+
+// CallAsync calls an RPC method asynchronously
+func (c *Caller) CallAsync(serviceName, methodName string, params map[string]interface{}, callback func(*CallResult)) {
+	go func() {
+		result, err := c.Call(serviceName, methodName, params)
+		if err != nil {
+			log.Printf("[Caller] Async call failed: %v", err)
+			callback(&CallResult{Success: false, Error: err.Error()})
+			return
+		}
+		callback(result)
+	}()
+}
+
+// generateID generates a unique request ID
+func generateID() string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
