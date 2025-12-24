@@ -52,6 +52,7 @@ light_link/
 
 ## NATS 服务配置
 
+- 远程服务器地址：`172.18.200.47:4222` (已部署，无需本地启动)
 - 配置文件：`deploy/nats/nats-server.conf`
 - TLS 证书目录：`deploy/nats/tls/`
 - 默认端口：4222
@@ -59,11 +60,10 @@ light_link/
 
 ## 快速开始
 
-### 启动 NATS 服务器
+### 连接 NATS 服务器
 
-```bash
-nats-server -config deploy/nats/nats-server.conf
-```
+NATS 服务器已部署在远程地址 `172.18.200.47:4222`，本地调试无需启动。
+如需使用环境变量覆盖：`set NATS_URL=nats://custom-address:4222`
 
 ### 运行测试
 
