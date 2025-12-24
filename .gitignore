@@ -1,5 +1,10 @@
 nul
 
+# NATS TLS certificates (sensitive files)
+deploy/nats/tls/*.crt
+deploy/nats/tls/*.key
+deploy/nats/tls/users/
+
 # NATS data directory
 data/jetstream/
 **/backups/
