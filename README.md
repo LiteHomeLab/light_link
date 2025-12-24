@@ -11,6 +11,95 @@
 | **状态保留** | 类似 MQTT retain 的最新状态功能（基于 NATS KV） |
 | **大文件传输** | 最大 1GB 文件传输（基于 NATS Object Store） |
 | **TLS 证书认证** | 双向 TLS 认证 + 用户权限配置 |
+| **服务管理平台** | Web 控制台，支持服务注册、发现、调试和监控 |
+
+## 服务管理平台
+
+LightLink 服务管理平台是一个完整的 Web 控制台，提供：
+
+- **服务注册与发现** - 自动服务注册，元数据管理
+- **服务监控** - 实时在线/离线状态，心跳检测
+- **RPC 调试** - Web 界面直接调用服务方法
+- **事件追踪** - 服务生命周期事件记录
+
+### 启动服务管理平台
+
+```bash
+# 1. 启动 NATS 服务器
+nats-server -config deploy/nats/nats-server.conf
+
+# 2. 启动 Web 控制台后端
+cd console/server
+go run main.go
+
+# 3. 启动 Web 前端（开发模式）
+cd console/web
+npm install
+npm run dev
+
+# 4. 访问控制台
+# 浏览器打开: http://localhost:5173
+# 默认账号: admin / admin123
+```
+
+### 注册带元数据的服务
+
+```go
+package main
+
+import (
+    "github.com/LiteHomeLab/light_link/sdk/go/service"
+    "github.com/LiteHomeLab/light_link/sdk/go/types"
+)
+
+func main() {
+    // 创建服务
+    svc, _ := service.NewService("my-service", "nats://localhost:4222", nil)
+
+    // 定义方法元数据
+    methodMeta := &types.MethodMetadata{
+        Name:        "add",
+        Description: "Add two numbers",
+        Params: []types.ParameterMetadata{
+            {Name: "a", Type: "number", Required: true, Description: "First number"},
+            {Name: "b", Type: "number", Required: true, Description: "Second number"},
+        },
+        Returns: []types.ReturnMetadata{
+            {Name: "sum", Type: "number", Description: "The sum"},
+        },
+        Example: &types.ExampleMetadata{
+            Input:  map[string]any{"a": 10, "b": 20},
+            Output: map[string]any{"sum": 30},
+        },
+    }
+
+    // 注册方法带元数据
+    svc.RegisterMethodWithMetadata("add", addHandler, methodMeta)
+
+    // 注册服务元数据
+    svc.RegisterMetadata(&types.ServiceMetadata{
+        Name:        "my-service",
+        Version:     "v1.0.0",
+        Description: "My awesome service",
+        Author:      "Your Name",
+        Tags:        []string{"demo", "example"},
+    })
+
+    // 启动服务
+    svc.Start()
+    select {}
+}
+
+func addHandler(args map[string]interface{}) (map[string]interface{}, error) {
+    a := args["a"].(float64)
+    b := args["b"].(float64)
+    return map[string]interface{}{"sum": a + b}, nil
+}
+```
+
+更多示例请查看：
+- [metadata-demo](examples/metadata-demo/main.go) - 带元数据的服务示例
+- [metadata-client](examples/metadata-client/main.go) - 客户端调用示例
 
 ## 支持的语言
 
@@ -92,11 +181,29 @@ light_link/
 │   ├── pubsub-demo/        # 发布订阅示例
 │   ├── state-demo/         # 状态管理示例
 │   ├── file-transfer-demo/ # 文件传输示例
+│   ├── metadata-demo/      # 带元数据的服务示例
+│   ├── metadata-client/    # 元数据服务客户端示例
 │   └── python-demo/        # Python 示例
+├── console/                # Web 服务管理平台
+│   ├── server/             # Go 后端服务
+│   │   ├── api/            # REST API 处理器
+│   │   ├── auth/           # JWT 认证
+│   │   ├── manager/        # 服务管理器
+│   │   ├── storage/        # SQLite 数据库
+│   │   ├── ws/             # WebSocket Hub
+│   │   └── proxy/          # RPC 调用代理
+│   └── web/                # Vue 3 前端
+│       ├── src/
+│       │   ├── api/        # API 客户端
+│       │   ├── views/      # 页面组件
+│       │   ├── stores/     # Pinia 状态管理
+│       │   └── router/     # Vue Router
+│       └── package.json
 ├── deploy/                 # 部署配置
 │   └── nats/               # NATS 服务器配置和 TLS 证书
 ├── docs/                   # 项目文档
 │   ├── getting-started.md  # 快速开始指南
+│   ├── service-management-platform.md # 服务管理平台设计
 │   └── sdk-api-comparison.md # SDK API 对比
 ├── CLAUDE.md               # 项目开发规则
 └── README.md               # 本文档
