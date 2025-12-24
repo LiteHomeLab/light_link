@@ -100,10 +100,28 @@
       <div class="result-content">
         <div v-if="result.error" class="error-section">
           <h4>错误信息:</h4>
-          <pre class="error">{{ result.error }}</pre>
+          <div v-if="isValidationError(result)" class="validation-error">
+            <div class="error-item">
+              <span class="error-label">参数名:</span>
+              <span class="error-value">{{ (result.data as any)?.parameter_name || '未知' }}</span>
+            </div>
+            <div class="error-item">
+              <span class="error-label">期望类型:</span>
+              <span class="error-value error-expected">{{ (result.data as any)?.expected_type || '未知' }}</span>
+            </div>
+            <div class="error-item">
+              <span class="error-label">实际类型:</span>
+              <span class="error-value error-actual">{{ (result.data as any)?.actual_type || '未知' }}</span>
+            </div>
+            <div v-if="(result.data as any)?.actual_value !== undefined" class="error-item">
+              <span class="error-label">实际值:</span>
+              <code class="error-value-code">{{ formatJSON((result.data as any).actual_value) }}</code>
+            </div>
+          </div>
+          <pre v-else class="error">{{ result.error }}</pre>
         </div>
 
-        <div v-if="result.data !== undefined && result.data !== null" class="data-section">
+        <div v-if="result.data !== undefined && result.data !== null && !isValidationError(result)" class="data-section">
           <h4>返回数据:</h4>
           <pre>{{ formatJSON(result.data) }}</pre>
         </div>
@@ -251,6 +269,13 @@ function useFirstExample() {
   ElMessage.success('已加载示例数据')
 }
 
+function isValidationError(result: CallResult | null): boolean {
+  return result !== null &&
+         !result.success &&
+         result.data !== undefined &&
+         (result.data as any)?.type === 'validation_error'
+}
+
 async function handleCall() {
   let params: any
   try {
@@ -367,6 +392,53 @@ onMounted(() => {
   padding: 12px;
   color: #c00;
   margin: 0;
+}
+
+.validation-error {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0;
+}
+
+.error-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.error-item:last-child {
+  margin-bottom: 0;
+}
+
+.error-label {
+  font-weight: bold;
+  min-width: 80px;
+  color: #856404;
+}
+
+.error-value {
+  color: #333;
+}
+
+.error-expected {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.error-actual {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.error-value-code {
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #dc3545;
 }
 
 .data-section pre {

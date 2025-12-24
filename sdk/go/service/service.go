@@ -122,9 +122,33 @@ func (s *Service) handleRPC(msg *nats.Msg) {
         return
     }
 
-    // Call handler
-    result, err := handler(request.Args)
+    // Get method metadata for validation
+    s.metaMutex.RLock()
+    methodMeta, hasMeta := s.methodsMeta[request.Method]
+    s.metaMutex.RUnlock()
+
+    // Validate parameters if metadata exists
+    if hasMeta {
+        validator := NewValidator(methodMeta)
+        if err := validator.Validate(request.Args); err != nil {
+            // Handle ValidationError specifically
+            if validationErr, ok := err.(*types.ValidationError); ok {
+                s.sendValidationError(msg, request.ID, validationErr)
+                return
+            }
+            s.sendError(msg, request.ID, err.Error())
+            return
+        }
+    }
+
+    // Call handler with panic recovery for type assertion errors
+    result, err := s.callHandlerSafely(handler, request.Args, request.Method, hasMeta, methodMeta)
     if err != nil {
+        // Check if it's a validation error from panic recovery
+        if validationErr, ok := err.(*types.ValidationError); ok {
+            s.sendValidationError(msg, request.ID, validationErr)
+            return
+        }
         s.sendError(msg, request.ID, err.Error())
         return
     }
@@ -149,6 +173,82 @@ func (s *Service) sendError(msg *nats.Msg, requestID, errMsg string) {
     }
     respData, _ := json.Marshal(response)
     msg.Respond(respData)
+}
+
+// sendValidationError sends a validation error response with structured error info
+func (s *Service) sendValidationError(msg *nats.Msg, requestID string, err *types.ValidationError) {
+    // Build structured error response
+    errorDetail := map[string]interface{}{
+        "type":           types.ValidationErrorType,
+        "parameter_name": err.ParameterName,
+        "expected_type":  err.ExpectedType,
+        "actual_type":    err.ActualType,
+        "message":        err.Message,
+    }
+    if err.ActualValue != nil {
+        errorDetail["actual_value"] = err.ActualValue
+    }
+
+    response := types.RPCResponse{
+        ID:      requestID,
+        Success: false,
+        Error:   err.Message,
+        Result:  errorDetail,
+    }
+
+    respData, _ := json.Marshal(response)
+    msg.Respond(respData)
+}
+
+// callHandlerSafely calls the handler with panic recovery
+func (s *Service) callHandlerSafely(
+    handler RPCHandler,
+    args map[string]interface{},
+    methodName string,
+    hasMeta bool,
+    methodMeta *types.MethodMetadata,
+) (result map[string]interface{}, err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = s.convertPanicToValidationError(r, args, methodName, hasMeta, methodMeta)
+        }
+    }()
+
+    result, err = handler(args)
+    return
+}
+
+// convertPanicToValidationError converts a panic to ValidationError
+func (s *Service) convertPanicToValidationError(
+    panicValue interface{},
+    args map[string]interface{},
+    methodName string,
+    hasMeta bool,
+    methodMeta *types.MethodMetadata,
+) *types.ValidationError {
+    // Try to parse the panic to find which parameter failed
+    if hasMeta && methodMeta != nil {
+        for _, param := range methodMeta.Params {
+            if value, exists := args[param.Name]; exists {
+                actualType := inferTypeString(value)
+                if !isTypeCompatible(param.Type, actualType) {
+                    return &types.ValidationError{
+                        ParameterName: param.Name,
+                        ExpectedType:  param.Type,
+                        ActualType:    actualType,
+                        ActualValue:   value,
+                        Message:       fmt.Sprintf("parameter '%s': expected type %s, got %s",
+                            param.Name, param.Type, actualType),
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: generic error with panic info
+    return &types.ValidationError{
+        Message: fmt.Sprintf("parameter type mismatch: %v", panicValue),
+    }
 }
 
 // Stop stops the service

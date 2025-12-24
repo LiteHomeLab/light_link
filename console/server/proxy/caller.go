@@ -72,10 +72,25 @@ func (c *Caller) Call(serviceName, methodName string, params map[string]interfac
 		}, nil
 	}
 
+	// Handle validation error with structured details
+	errorMsg := response.Error
+	if !response.Success && response.Result != nil {
+		// Check if this is a structured validation error
+		if errType, ok := response.Result["type"].(string); ok && errType == types.ValidationErrorType {
+			// Build more detailed error message
+			if paramName, ok := response.Result["parameter_name"].(string); ok {
+				expectedType, _ := response.Result["expected_type"].(string)
+				actualType, _ := response.Result["actual_type"].(string)
+				errorMsg = fmt.Sprintf("参数 '%s' 类型错误: 期望 %s，实际 %s",
+					paramName, expectedType, actualType)
+			}
+		}
+	}
+
 	return &CallResult{
 		Success:  response.Success,
 		Data:     response.Result,
-		Error:    response.Error,
+		Error:    errorMsg,
 		Duration: time.Since(start).Milliseconds(),
 	}, nil
 }
