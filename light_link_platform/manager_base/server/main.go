@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"log"
 	"net/http"
 	"os"
@@ -113,10 +114,20 @@ func connectNATS(cfg *config.Config) (*nats.Conn, error) {
 
 	if cfg.NATS.TLS.Enabled {
 		// Configure TLS with client certificate
-		opts = append(opts,
-			nats.RootCAs(cfg.NATS.TLS.CA),
-			nats.ClientCert(cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key),
-		)
+		if cfg.NATS.TLS.ServerName != "" {
+			opts = append(opts, nats.TLSClientAuth(cfg.NATS.TLS.CA, cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key))
+			// Create custom TLS config with ServerName
+			tlsConfig := &tls.Config{
+				ServerName: cfg.NATS.TLS.ServerName,
+				MinVersion: tls.VersionTLS12,
+			}
+			opts = append(opts, nats.Secure(tlsConfig))
+		} else {
+			opts = append(opts,
+				nats.RootCAs(cfg.NATS.TLS.CA),
+				nats.ClientCert(cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key),
+			)
+		}
 	}
 
 	return nats.Connect(cfg.NATS.URL, opts...)

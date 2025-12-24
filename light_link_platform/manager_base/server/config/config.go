@@ -32,10 +32,11 @@ type NATSConfig struct {
 
 // TLSConfig represents the TLS configuration
 type TLSConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Cert    string `yaml:"cert"`
-	Key     string `yaml:"key"`
-	CA      string `yaml:"ca"`
+	Enabled    bool   `yaml:"enabled"`
+	Cert       string `yaml:"cert"`
+	Key        string `yaml:"key"`
+	CA         string `yaml:"ca"`
+	ServerName string `yaml:"server_name,omitempty"`
 }
 
 // DatabaseConfig represents the database configuration
@@ -113,6 +114,13 @@ func GetDefaultConfig() *Config {
 		},
 		NATS: NATSConfig{
 			URL: "nats://172.18.200.47:4222",
+			TLS: TLSConfig{
+				Enabled:    false,
+				CA:         "tls/ca.crt",
+				Cert:       "tls/manager.crt",
+				Key:        "tls/manager.key",
+				ServerName: "nats-server",
+			},
 		},
 		Database: DatabaseConfig{
 			Path: "data/light_link.db",
