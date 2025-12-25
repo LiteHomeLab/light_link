@@ -16,12 +16,18 @@ func (s *Service) RegisterMetadata(metadata *types.ServiceMetadata) error {
 	// Store metadata
 	s.metadata = metadata
 
-	// Send registration message to NATS
+	// Send registration message to NATS with instance info
 	msg := types.RegisterMessage{
 		Service:   s.name,
 		Version:   metadata.Version,
 		Metadata:  *metadata,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Unix(),
+		InstanceInfo: types.InstanceInfo{
+			Language:   "go",
+			HostIP:     s.hostInfo.IP,
+			HostMAC:    s.hostInfo.MAC,
+			WorkingDir: s.hostInfo.WorkingDir,
+		},
 	}
 
 	data, err := json.Marshal(msg)

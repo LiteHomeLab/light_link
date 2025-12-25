@@ -19,16 +19,18 @@ type ServiceOption func(*Service) error
 
 // Service represents a service
 type Service struct {
-	name          string
-	nc            *nats.Conn
-	tlsConfig     *client.TLSConfig
-	rpcMap        map[string]RPCHandler
-	rpcMutex      sync.RWMutex
-	metadata      *types.ServiceMetadata
-	metaMutex     sync.RWMutex
-	methodsMeta   map[string]*types.MethodMetadata
-	running       bool
-	heartbeatStop chan struct{}
+	name           string
+	nc             *nats.Conn
+	tlsConfig      *client.TLSConfig
+	rpcMap         map[string]RPCHandler
+	rpcMutex       sync.RWMutex
+	metadata       *types.ServiceMetadata
+	metaMutex      sync.RWMutex
+	methodsMeta    map[string]*types.MethodMetadata
+	running        bool
+	heartbeatStop  chan struct{}
+	hostInfo       *client.HostInfo
+	controlHandler *ControlHandler
 }
 
 // WithServiceAutoTLS automatically discovers and uses server TLS certificates
@@ -94,6 +96,15 @@ func NewService(name, natsURL string, opts ...ServiceOption) (*Service, error) {
 	}
 
 	service.nc = nc
+
+	// Get host info for instance identification
+	hostInfo, err := client.GetHostInfo()
+	if err != nil {
+		nc.Close()
+		return nil, fmt.Errorf("get host info: %w", err)
+	}
+	service.hostInfo = hostInfo
+
 	return service, nil
 }
 
@@ -136,6 +147,13 @@ func (s *Service) Start() error {
     // Start heartbeat
     if err := s.startHeartbeat(); err != nil {
         return fmt.Errorf("start heartbeat: %w", err)
+    }
+
+    // Start control handler
+    instanceKey := fmt.Sprintf("%s:%s:%s", s.hostInfo.IP, normalizeMAC(s.hostInfo.MAC), s.name)
+    s.controlHandler = NewControlHandler(s.nc, s.name, instanceKey)
+    if err := s.controlHandler.Subscribe(); err != nil {
+        return fmt.Errorf("start control handler: %w", err)
     }
 
     s.running = true
@@ -300,7 +318,24 @@ func (s *Service) Stop() error {
     close(s.heartbeatStop)
     s.heartbeatStop = make(chan struct{})
 
+    // Stop control handler
+    if s.controlHandler != nil {
+        s.controlHandler.Unsubscribe()
+        s.controlHandler = nil
+    }
+
     s.nc.Close()
     s.running = false
     return nil
+}
+
+// normalizeMAC removes colons and dashes from MAC address for use as lock key
+func normalizeMAC(mac string) string {
+	result := make([]byte, 0, len(mac))
+	for _, c := range mac {
+		if c != ':' && c != '-' {
+			result = append(result, byte(c))
+		}
+	}
+	return string(result)
 }

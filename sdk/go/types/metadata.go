@@ -50,17 +50,34 @@ type ExampleMetadata struct {
 
 // RegisterMessage 注册消息
 type RegisterMessage struct {
-	Service   string          `json:"service"`
-	Version   string          `json:"version"`
-	Metadata  ServiceMetadata `json:"metadata"`
-	Timestamp time.Time       `json:"timestamp"`
+	Service      string          `json:"service"`
+	Version      string          `json:"version"`
+	Metadata     ServiceMetadata `json:"metadata"`
+	Timestamp    int64           `json:"timestamp"`
+	InstanceInfo InstanceInfo    `json:"instance_info"`
 }
 
 // HeartbeatMessage 心跳消息
 type HeartbeatMessage struct {
-	Service   string    `json:"service"`
-	Version   string    `json:"version"`
-	Timestamp time.Time `json:"timestamp"`
+	Service   string `json:"service"`
+	Version   string `json:"version"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// InstanceInfo 实例信息
+type InstanceInfo struct {
+	Language   string `json:"language"`
+	HostIP     string `json:"host_ip"`
+	HostMAC    string `json:"host_mac"`
+	WorkingDir string `json:"working_dir"`
+}
+
+// ControlMessage 控制消息
+type ControlMessage struct {
+	Service     string `json:"service"`
+	InstanceKey string `json:"instance_key"`
+	Command     string `json:"command"` // stop, restart
+	Timestamp   int64  `json:"timestamp"`
 }
 
 // ServiceEvent 服务事件

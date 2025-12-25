@@ -52,7 +52,7 @@ func (s *Service) sendHeartbeat(subject string) error {
 	msg := types.HeartbeatMessage{
 		Service:   s.name,
 		Version:   version,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Unix(),
 	}
 
 	data, err := json.Marshal(msg)
