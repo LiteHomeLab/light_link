@@ -6,6 +6,8 @@ using NATS.Client;
 using System.Text.Json;
 using LightLink.Types;
 using LightLink.Metadata;
+using System.Security.Cryptography.X509Certificates;
+using NATS.Client.Internals;
 
 namespace LightLink
 {
@@ -16,6 +18,7 @@ namespace LightLink
         private readonly string _name;
         private readonly string _natsURL;
         private readonly Options _natsOptions;
+        private readonly TLSConfig? _tlsConfig;
         private IConnection _nc;
         private readonly Dictionary<string, RPCHandler> _rpcHandlers;
         private readonly ReaderWriterLockSlim _rpcLock;
@@ -26,15 +29,24 @@ namespace LightLink
 
         private const int HeartbeatIntervalMs = 30000;
 
-        public Service(string name, string natsURL) : this(name, natsURL, null)
+        public Service(string name, string natsURL) : this(name, natsURL, null, null)
         {
         }
 
-        public Service(string name, string natsURL, Options natsOptions)
+        public Service(string name, string natsURL, Options natsOptions) : this(name, natsURL, natsOptions, null)
+        {
+        }
+
+        public Service(string name, string natsURL, TLSConfig tlsConfig) : this(name, natsURL, null, tlsConfig)
+        {
+        }
+
+        public Service(string name, string natsURL, Options natsOptions, TLSConfig tlsConfig)
         {
             _name = name;
             _natsURL = natsURL;
             _natsOptions = natsOptions;
+            _tlsConfig = tlsConfig;
             _rpcHandlers = new Dictionary<string, RPCHandler>();
             _methodMetadata = new Dictionary<string, MethodMetadata>();
             _rpcLock = new ReaderWriterLockSlim();
@@ -72,6 +84,21 @@ namespace LightLink
             var opts = _natsOptions ?? ConnectionFactory.GetDefaultOptions();
             if (opts.Url == null) opts.Url = _natsURL;
             opts.Name = $"LightLink Service: {_name}";
+
+            // Configure TLS if tlsConfig is provided
+            if (_tlsConfig != null)
+            {
+                opts.Secure = true;
+                try
+                {
+                    var cert = new X509Certificate2(_tlsConfig.CertFile);
+                    opts.AddCertificate(cert);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Failed to load TLS certificate: {ex.Message}", ex);
+                }
+            }
 
             _nc = new ConnectionFactory().CreateConnection(opts);
 

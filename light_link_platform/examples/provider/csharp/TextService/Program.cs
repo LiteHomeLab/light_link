@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using LightLink;
 using LightLink.Metadata;
-using NATS.Client;
 
 namespace TextService
 {
@@ -15,32 +14,13 @@ namespace TextService
 
             // Discover client certificates
             Console.WriteLine("\n[1/4] Discovering TLS certificates...");
-            var tlsResult = LightLink.TLSConfig.CertDiscovery.DiscoverClientCerts();
-            if (!tlsResult.Found)
-            {
-                Console.WriteLine("ERROR: Client certificates not found!");
-                Console.WriteLine("Please copy the 'client/' folder to your service directory.");
-                return;
-            }
+            var tlsConfig = CertDiscovery.GetAutoTLSConfig();
             Console.WriteLine($"Certificates found:");
-            Console.WriteLine($"  CA:   {tlsResult.CaFile}");
-            Console.WriteLine($"  Cert: {tlsResult.CertFile}");
-            Console.WriteLine($"  Key:  {tlsResult.KeyFile}");
+            Console.WriteLine($"  CA:   {tlsConfig.CaFile}");
+            Console.WriteLine($"  Cert: {tlsConfig.CertFile}");
+            Console.WriteLine($"  Key:  {tlsConfig.KeyFile}");
 
-            var opts = ConnectionFactory.GetDefaultOptions();
-            opts.Url = "nats://172.18.200.47:4222";
-            opts.Name = "C# Text Service";
-            opts.ReconnectWait = 2000;
-            opts.MaxReconnect = 10;
-            opts.PingInterval = 20000;
-            opts.Timeout = 10000;
-
-            // Configure TLS
-            var tlsConfig = LightLink.TLSConfig.CertDiscovery.ToTLSConfig(tlsResult);
-            opts.SetCertificate(tlsConfig.CaFile, tlsConfig.CertFile, tlsConfig.KeyFile);
-            opts.Secure = true;
-
-            var svc = new Service("csharp-text-service", "nats://172.18.200.47:4222", opts);
+            var svc = new Service("csharp-text-service", "nats://172.18.200.47:4222", tlsConfig);
 
             // Register methods with metadata
             svc.RegisterMethodWithMetadata("reverse", ReverseHandler, new MethodMetadata

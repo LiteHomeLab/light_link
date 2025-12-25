@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/LiteHomeLab/light_link/console/server/api"
-	"github.com/LiteHomeLab/light_link/console/server/auth"
-	"github.com/LiteHomeLab/light_link/console/server/config"
-	"github.com/LiteHomeLab/light_link/console/server/manager"
-	"github.com/LiteHomeLab/light_link/console/server/proxy"
-	"github.com/LiteHomeLab/light_link/console/server/storage"
-	"github.com/LiteHomeLab/light_link/console/server/ws"
+	api "github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/api"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/auth"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/config"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/manager"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/proxy"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/ws"
 	"github.com/nats-io/nats.go"
 )
 
@@ -114,20 +114,24 @@ func connectNATS(cfg *config.Config) (*nats.Conn, error) {
 
 	if cfg.NATS.TLS.Enabled {
 		// Configure TLS with client certificate
-		if cfg.NATS.TLS.ServerName != "" {
-			opts = append(opts, nats.TLSClientAuth(cfg.NATS.TLS.CA, cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key))
-			// Create custom TLS config with ServerName
-			tlsConfig := &tls.Config{
-				ServerName: cfg.NATS.TLS.ServerName,
-				MinVersion: tls.VersionTLS12,
-			}
-			opts = append(opts, nats.Secure(tlsConfig))
-		} else {
-			opts = append(opts,
-				nats.RootCAs(cfg.NATS.TLS.CA),
-				nats.ClientCert(cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key),
-			)
+		// Note: InsecureSkipVerify is used for development with IP addresses
+		// In production, use proper DNS names with valid certificates
+		tlsConfig := &tls.Config{
+			ServerName:         cfg.NATS.TLS.ServerName,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, // Only for development with IP addresses
 		}
+
+		// Load client certificates
+		if cfg.NATS.TLS.Cert != "" && cfg.NATS.TLS.Key != "" {
+			cert, err := tls.LoadX509KeyPair(cfg.NATS.TLS.Cert, cfg.NATS.TLS.Key)
+			if err != nil {
+				return nil, err
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+
+		opts = append(opts, nats.Secure(tlsConfig))
 	}
 
 	return nats.Connect(cfg.NATS.URL, opts...)

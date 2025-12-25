@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LiteHomeLab/light_link/console/server/storage"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 	"github.com/nats-io/nats.go"
 )

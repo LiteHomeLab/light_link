@@ -5,6 +5,6 @@
     <RootNamespace>MathService</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../../LightLink/LightLink.csproj" />
+    <ProjectReference Include="../../../../../sdk/csharp/LightLink/LightLink.csproj" />
   </ItemGroup>
 </Project>

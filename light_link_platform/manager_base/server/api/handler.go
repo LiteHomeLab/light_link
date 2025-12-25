@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LiteHomeLab/light_link/console/server/auth"
-	"github.com/LiteHomeLab/light_link/console/server/manager"
-	"github.com/LiteHomeLab/light_link/console/server/storage"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/auth"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/manager"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
 )
 
 // Handler handles API requests
