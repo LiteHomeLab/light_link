@@ -50,3 +50,4 @@ build/
 .DS_Store
 Thumbs.db
 *.db
+/light_link_platform/client
