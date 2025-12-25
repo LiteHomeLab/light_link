@@ -91,23 +91,18 @@ namespace LightLink
                 opts.Secure = true;
                 try
                 {
-                    // Load CA certificate
-                    var caCert = new X509Certificate2(_tlsConfig.CaFile);
-                    var clientCert = new X509Certificate2(_tlsConfig.CertFile);
+                    var cert = new X509Certificate2(_tlsConfig.CertFile);
+                    opts.AddCertificate(cert);
 
-                    // Add certificates
-                    opts.AddCertificate(clientCert);
-
-                    // For self-signed certificates, we need to skip verification
-                    // NATS.Client uses .NET SslStream which validates by default
+                    // For self-signed certificates, skip server name verification
+                    // Set global callback before any connection is established
                     if (_tlsConfig.InsecureSkipVerify)
                     {
-                        // Set up event handler to bypass certificate validation
-                        // This must be done before connection
-                        opts.ServerCertificateValidationCallback =
-                            (sender, certificate, chain, errors) =>
+                        System.Net.ServicePointManager.ServerCertificateValidationCallback =
+                            (sender, certificate, chain, sslPolicyErrors) =>
                             {
-                                // Skip all validation for self-signed certs
+                                // Skip validation for self-signed certificates
+                                // Connection is still encrypted with TLS
                                 return true;
                             };
                     }

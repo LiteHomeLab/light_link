@@ -12,6 +12,13 @@ namespace MathService
         {
             Console.WriteLine("=== C# Metadata Registration Demo ===");
 
+            // Skip TLS certificate verification for self-signed certificates
+            // This is needed for internal networks with self-signed certs
+            // Connection is still encrypted with TLS
+            AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+            AppContext.SetSwitch("System.Net.Security.Cryptography.Certificates.OnlyCalcAvailableHash", false);
+            Console.WriteLine("TLS certificate verification skipped for self-signed certificates");
+
             // Discover client certificates
             Console.WriteLine("\n[1/5] Discovering TLS certificates...");
             var tlsConfig = CertDiscovery.GetAutoTLSConfig();

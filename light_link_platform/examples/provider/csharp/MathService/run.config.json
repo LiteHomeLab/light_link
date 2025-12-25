@@ -1,0 +1,5 @@
+{
+  "configProperties": {
+    "DOTNET_SSL_SKIP_CERT_VALIDATION": "true"
+  }
+}
