@@ -156,24 +156,48 @@ namespace MathService
             await Task.Delay(-1);
         }
 
+        // Helper method to extract double value from args
+        static double GetDouble(Dictionary<string, object> args, string key)
+        {
+            if (!args.ContainsKey(key))
+                throw new ArgumentException($"Missing parameter: {key}");
+
+            var value = args[key];
+            if (value == null)
+                throw new ArgumentException($"Parameter '{key}' is null");
+
+            // Handle JsonElement (from System.Text.Json deserialization)
+            if (value is System.Text.Json.JsonElement element)
+            {
+                if (element.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    return element.GetDouble();
+                else if (element.ValueKind == System.Text.Json.JsonValueKind.String)
+                    return double.Parse(element.GetString() ?? "0");
+                throw new ArgumentException($"Parameter '{key}' is not a number");
+            }
+
+            // Handle direct numeric types
+            return Convert.ToDouble(value);
+        }
+
         static Task<Dictionary<string, object>> AddHandler(Dictionary<string, object> args)
         {
-            double a = Convert.ToDouble(args["a"]);
-            double b = Convert.ToDouble(args["b"]);
+            double a = GetDouble(args, "a");
+            double b = GetDouble(args, "b");
             return Task.FromResult(new Dictionary<string, object> { { "sum", a + b } });
         }
 
         static Task<Dictionary<string, object>> MultiplyHandler(Dictionary<string, object> args)
         {
-            double a = Convert.ToDouble(args["a"]);
-            double b = Convert.ToDouble(args["b"]);
+            double a = GetDouble(args, "a");
+            double b = GetDouble(args, "b");
             return Task.FromResult(new Dictionary<string, object> { { "product", a * b } });
         }
 
         static Task<Dictionary<string, object>> PowerHandler(Dictionary<string, object> args)
         {
-            double baseValue = Convert.ToDouble(args["base"]);
-            double exp = Convert.ToDouble(args["exp"]);
+            double baseValue = GetDouble(args, "base");
+            double exp = GetDouble(args, "exp");
             double result = 1.0;
             for (int i = 0; i < (int)exp; i++)
             {
@@ -184,8 +208,8 @@ namespace MathService
 
         static Task<Dictionary<string, object>> DivideHandler(Dictionary<string, object> args)
         {
-            double numerator = Convert.ToDouble(args["numerator"]);
-            double denominator = Convert.ToDouble(args["denominator"]);
+            double numerator = GetDouble(args, "numerator");
+            double denominator = GetDouble(args, "denominator");
             if (denominator == 0)
             {
                 throw new ArgumentException("division by zero");

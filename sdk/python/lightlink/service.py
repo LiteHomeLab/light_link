@@ -136,12 +136,12 @@ class Service:
     async def _send_success(self, msg, request_id: str, result: Dict[str, Any]) -> None:
         """发送成功响应"""
         response = RPCResponse(id=request_id, success=True, result=result)
-        msg.respond(json.dumps(response.__dict__).encode())
+        await msg.respond(json.dumps(response.__dict__).encode())
 
     async def _send_error(self, msg, request_id: str, error: str) -> None:
         """发送错误响应"""
         response = RPCResponse(id=request_id, success=False, error=error)
-        msg.respond(json.dumps(response.__dict__).encode())
+        await msg.respond(json.dumps(response.__dict__).encode())
 
     async def _start_heartbeat(self) -> None:
         """启动心跳"""
