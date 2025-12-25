@@ -54,6 +54,9 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 	}
 
 	log.Printf("[Registry] Service registration: %s v%s", register.Service, register.Version)
+	log.Printf("[Registry] Instance info: lang=%s, ip=%s, mac=%s, dir=%s",
+		register.InstanceInfo.Language, register.InstanceInfo.HostIP,
+		register.InstanceInfo.HostMAC, register.InstanceInfo.WorkingDir)
 
 	// Check if this is an update
 	isUpdate := r.db.ServiceExists(register.Service)

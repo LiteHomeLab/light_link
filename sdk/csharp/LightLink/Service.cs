@@ -8,6 +8,10 @@ using LightLink.Types;
 using LightLink.Metadata;
 using System.Security.Cryptography.X509Certificates;
 using NATS.Client.Internals;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Linq;
 
 namespace LightLink
 {
@@ -195,7 +199,7 @@ namespace LightLink
             {
                 service = _name,
                 version = "1.0.0",
-                timestamp = DateTime.UtcNow
+                timestamp = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds()
             };
 
             string json = JsonSerializer.Serialize(heartbeat);
@@ -251,12 +255,28 @@ namespace LightLink
             if (_nc == null)
                 throw new InvalidOperationException("Service not started. Call Start() first.");
 
+            // Get instance info
+            var hostIP = GetLocalIPAddress();
+            var hostMAC = GetMacAddress();
+            var workingDir = Environment.CurrentDirectory;
+
+            Console.WriteLine($"[DEBUG] Instance info - IP: {hostIP}, MAC: {hostMAC}, Dir: {workingDir}");
+
+            var instanceInfo = new InstanceInfo
+            {
+                Language = "csharp",
+                HostIP = hostIP,
+                HostMAC = hostMAC,
+                WorkingDir = workingDir
+            };
+
             var msg = new
             {
                 service = _name,
                 version = metadata.Version,
                 metadata = metadata,
-                timestamp = DateTime.UtcNow
+                timestamp = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds(),
+                instance_info = instanceInfo
             };
 
             string json = JsonSerializer.Serialize(msg);
@@ -269,6 +289,62 @@ namespace LightLink
             Stop();
             _rpcLock?.Dispose();
             _metaLock?.Dispose();
+        }
+
+        // GetLocalIPAddress gets the local IP address
+        private string GetLocalIPAddress()
+        {
+            try
+            {
+                // Try to get IPv4 address from all network interfaces
+                foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus == OperationalStatus.Up &&
+                        nic.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    {
+                        var ipProps = nic.GetIPProperties();
+                        foreach (var addr in ipProps.UnicastAddresses)
+                        {
+                            if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                            {
+                                return addr.Address.ToString();
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors
+            }
+            return "127.0.0.1";
+        }
+
+        // GetMacAddress gets the MAC address
+        private string GetMacAddress()
+        {
+            try
+            {
+                foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus == OperationalStatus.Up &&
+                        nic.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    {
+                        var macBytes = nic.GetPhysicalAddress().GetAddressBytes();
+                        if (macBytes.Length > 0)
+                        {
+                            // Format as XX:XX:XX:XX:XX:XX
+                            var macAddr = string.Join(":", macBytes.Select(b => b.ToString("X2")));
+                            return macAddr;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors
+            }
+            return "00:00:00:00:00:00";
         }
     }
 }

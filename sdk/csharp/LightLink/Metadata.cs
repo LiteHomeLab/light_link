@@ -48,4 +48,19 @@ namespace LightLink.Metadata
         public DateTime RegisteredAt { get; set; }
         public DateTime LastSeen { get; set; }
     }
+
+    public class InstanceInfo
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("language")]
+        public string Language { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("host_ip")]
+        public string HostIP { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("host_mac")]
+        public string HostMAC { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("working_dir")]
+        public string WorkingDir { get; set; } = "";
+    }
 }

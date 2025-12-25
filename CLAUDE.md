@@ -62,6 +62,7 @@ light_link/
      - 提供 RPC 服务 → provider/
      - 调用 RPC 服务 → caller/
      - 消息通知/状态管理 → notify/
+9. **图片识别服务规则**: 使用 MCP 或 Agent 的截图/图片识别能力时，发送到识别服务前请确保图片尺寸小于 1000x1000
 
 ## NATS 服务配置
 
