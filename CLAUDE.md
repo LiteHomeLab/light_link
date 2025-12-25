@@ -66,22 +66,24 @@ light_link/
 ## NATS 服务配置
 
 - 远程服务器地址：`172.18.200.47:4222` (已部署，无需本地启动)
+- 服务器已启用 TLS，使用私有证书进行双向认证
 - 配置文件：`deploy/nats/nats-server.conf`
-- TLS 证书：通过 `deploy/nats/create_tls/` 子模块生成（Git submodule -> git@github.com:LiteHomeLab/create_tls.git）
+- 私有证书位置：`light_link_platform/client/` 目录下（已包含连接所需证书）
 - 默认端口：4222
 - 需要 JetStream 支持（KV 和 Object Store）
 
-### 生成 TLS 证书
+### TLS 证书说明
 
-证书生成脚本已移至独立仓库 `create_tls`，作为 Git 子模块引入：
+- NATS 服务器已部署并使用私有证书，**不要自行生成证书**
+- 连接所需的私有证书位于 `light_link_platform/client/` 目录
+- 如需测试新证书，请联系管理员获取或使用 `deploy/nats/create_tls/` 子模块：
 
 ```bash
-# 生成证书
+# 仅用于证书维护，日常开发无需操作
 cd deploy/nats/create_tls
 setup-certs.bat
 
 # 更新子模块到最新版本
-cd deploy/nats/create_tls
 git pull origin main
 ```
 
