@@ -8,6 +8,7 @@ deploy/nats/tls/users/
 # NATS data directory
 data/jetstream/
 **/backups/
+**/backup/
 
 # Test configs
 *-test.conf

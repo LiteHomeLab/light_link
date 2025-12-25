@@ -1,0 +1,3 @@
+[submodule "deploy/nats/create_tls"]
+	path = deploy/nats/create_tls
+	url = git@github.com:LiteHomeLab/create_tls.git

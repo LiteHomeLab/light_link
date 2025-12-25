@@ -22,7 +22,9 @@ light_link/
 │   └── types/           # 公共类型定义
 ├── sdk/python/          # Python SDK
 ├── sdk/csharp/          # C# SDK
-├── deploy/nats/         # NATS 服务器配置和 TLS 证书
+├── deploy/nats/         # NATS 服务器配置
+│   ├── tls/             # TLS 证书模板和文档
+│   └── create_tls/      # TLS 证书生成脚本 (Git submodule)
 ├── examples/            # SDK 基础功能示例
 ├── light_link_platform/ # 管理平台和多语言示例服务
 │   ├── manager_base/    # 管理平台 (server + web)
@@ -54,9 +56,23 @@ light_link/
 
 - 远程服务器地址：`172.18.200.47:4222` (已部署，无需本地启动)
 - 配置文件：`deploy/nats/nats-server.conf`
-- TLS 证书目录：`deploy/nats/tls/`
+- TLS 证书：通过 `deploy/nats/create_tls/` 子模块生成（Git submodule -> git@github.com:LiteHomeLab/create_tls.git）
 - 默认端口：4222
 - 需要 JetStream 支持（KV 和 Object Store）
+
+### 生成 TLS 证书
+
+证书生成脚本已移至独立仓库 `create_tls`，作为 Git 子模块引入：
+
+```bash
+# 生成证书
+cd deploy/nats/create_tls
+setup-certs.bat
+
+# 更新子模块到最新版本
+cd deploy/nats/create_tls
+git pull origin main
+```
 
 ## 快速开始
 

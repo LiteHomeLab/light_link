@@ -1,80 +1,67 @@
-# TLS Certificate Management
+# LightLink TLS Certificate Management
 
-## Directory Structure
+## Overview
 
-```
-deploy/nats/tls/
-├── ca.key, ca.crt           # CA Certificate (Root of Trust)
-├── server.key, server.crt   # NATS Server Certificate
-├── generate-certs.bat       # Generate all certificates
-├── generate-service-cert.bat # Generate single service certificate
-├── cert-manifest.txt        # List of all services
-├── demo-service.*           # Demo service certificates
-├── test-service.*           # Test service certificates
-├── client-app.*             # Client app certificates
-└── clients/                 # Client distribution packages
-    ├── demo-service/
-    │   ├── ca.crt
-    │   ├── demo-service.crt
-    │   ├── demo-service.key
-    │   └── README.md
-    ├── test-service/
-    │   └── ...
-    └── {service-name}/
-        └── ...
-```
+This directory contains the TLS certificate templates and references for LightLink NATS communication.
 
-## Generate New Service Certificate
+The certificate generation scripts have been moved to a separate repository: **[create_tls](https://github.com/LiteHomeLab/create_tls)**
 
-### Quick Start
+## Quick Start
+
+### Generate New Certificates
+
+The certificate generation is now managed by the `create_tls` submodule:
 
 ```batch
-cd deploy/nats/tls
-generate-service-cert.bat my-service
+cd deploy/nats/create_tls
+setup-certs.bat
 ```
 
-This creates:
-1. Certificate files in current directory: `my-service.key`, `my-service.crt`
-2. Client distribution package: `clients/my-service/`
-   - `ca.crt` - CA Root Certificate
-   - `my-service.crt` - Service Certificate
-   - `my-service.key` - Service Private Key
-   - `README.md` - Deployment instructions
+This will generate a timestamped folder `certs-YYYY-MM-DD_HH-MM/` containing:
 
-### Deploy to Service
-
-```batch
-# Copy client package to service directory
-xcopy /E /I deploy\nats\tls\clients\my-service my-service\tls\
-
-# Or manually
-mkdir my-service\tls
-copy deploy\nats\tls\clients\my-service\*.* my-service\tls\
+```
+certs-YYYY-MM-DD_HH-MM/
+├── nats-server/     # Deploy to NATS server
+│   ├── ca.crt
+│   ├── server.crt
+│   ├── server.key
+│   └── README.txt
+└── client/          # Deploy to ALL client services
+    ├── ca.crt
+    ├── client.crt
+    ├── client.key
+    └── README.txt
 ```
 
-## Certificate Files
+### Deploy Certificates
 
-| File | Purpose | Distribution |
-|------|---------|--------------|
-| `ca.crt` | CA Root Certificate | All clients (public) |
-| `ca.key` | CA Private Key | CA server only (SECRET) |
-| `server.crt` | NATS Server Certificate | NATS server only |
-| `server.key` | NATS Server Private Key | NATS server only (SECRET) |
-| `{service}.crt` | Service Certificate | Service deployment |
-| `{service}.key` | Service Private Key | Service deployment (SECRET) |
+1. **NATS Server**: Copy `nats-server/` folder to your NATS server
+2. **Client Services**: Copy `client/` folder to your service directory
 
-## Default TLS Configuration
+## External Repository
 
-After copying to `tls/` directory, use these default paths:
+- **Repository**: [git@github.com:LiteHomeLab/create_tls.git](https://github.com/LiteHomeLab/create_tls)
+- **Location**: `deploy/nats/create_tls/` (Git submodule)
+- **Purpose**: Certificate generation scripts and documentation
+
+## Certificate Architecture
+
+| Certificate | CN (Common Name) | Used By |
+|-------------|------------------|---------|
+| CA Root | `LightLink CA` | Signs all certificates |
+| NATS Server | `nats-server` | NATS server only |
+| Client | `lightlink-client` | All client services (shared) |
+
+## Client Connection Configuration
 
 ### Go SDK
 
 ```go
 tlsConfig := &client.TLSConfig{
-    CaFile:     "tls/ca.crt",
-    CertFile:   "tls/my-service.crt",
-    KeyFile:    "tls/my-service.key",
-    ServerName: "nats-server",
+    CaFile:     "client/ca.crt",
+    CertFile:   "client/client.crt",
+    KeyFile:    "client/client.key",
+    ServerName: "nats-server",  // Must match server certificate CN
 }
 client, err := client.NewClient("tls://172.18.200.47:4222", tlsConfig)
 ```
@@ -83,31 +70,77 @@ client, err := client.NewClient("tls://172.18.200.47:4222", tlsConfig)
 
 ```python
 tls_config = TLSConfig(
-    ca_file="tls/ca.crt",
-    cert_file="tls/my-service.crt",
-    key_file="tls/my-service.key",
-    server_name="nats-server"
+    ca_file="client/ca.crt",
+    cert_file="client/client.crt",
+    key_file="client/client.key",
+    server_name="nats-server"  # Must match server certificate CN
 )
 client = Client(tls_config=tls_config)
 ```
 
-### Environment Variables (Optional Override)
+### C# SDK
+
+```csharp
+Options opts = ConnectionFactory.GetDefaultOptions();
+opts.Url = "tls://172.18.200.47:4222";
+opts.SSL = true;
+opts.SetCertificate("client/ca.crt", "client/client.crt", "client/client.key");
+```
+
+## Environment Variables (Optional)
 
 ```bash
 set NATS_URL=tls://172.18.200.47:4222
-set TLS_CA=tls/ca.crt
-set TLS_CERT=tls/my-service.crt
-set TLS_KEY=tls/my-service.key
+set TLS_CA=client/ca.crt
+set TLS_CERT=client/client.crt
+set TLS_KEY=client/client.key
 set TLS_SERVER_NAME=nats-server
 ```
 
 ## Security Notes
 
-- **Private Keys (.key files) must be kept secure!**
+- **Private keys (.key files) must be kept secure!**
 - Never commit .key files to version control
-- Use secure channels to distribute client packages
+- Use secure channels to distribute certificate packages
 - CA certificate (ca.crt) is public and can be freely distributed
 
-## Certificate Manifest
+## Update Submodule
 
-See `cert-manifest.txt` for a list of all generated services.
+To update the `create_tls` submodule to the latest version:
+
+```batch
+cd deploy/nats/create_tls
+git pull origin main
+cd ../..
+git add deploy/nats/create_tls
+git commit -m "chore: update create_tls submodule"
+```
+
+## Directory Structure
+
+```
+deploy/nats/
+├── tls/              # This directory (templates and docs)
+│   └── README.md
+└── create_tls/       # Git submodule -> git@github.com:LiteHomeLab/create_tls.git
+    ├── setup-certs.bat
+    ├── find-openssl.bat
+    ├── setup-certs-dependency.txt
+    └── README.md
+```
+
+## Troubleshooting
+
+If `setup-certs.bat` cannot find OpenSSL, run:
+
+```batch
+cd deploy/nats/create_tls
+find-openssl.bat
+```
+
+This diagnostic tool will search for OpenSSL on your system.
+
+## See Also
+
+- [create_tls Repository](https://github.com/LiteHomeLab/create_tls)
+- [Project Documentation](../../../docs/)
