@@ -91,14 +91,25 @@ namespace LightLink
                 opts.Secure = true;
                 try
                 {
-                    var cert = new X509Certificate2(_tlsConfig.CertFile);
+                    X509Certificate2 cert;
+
+                    // Prefer PFX format (NATS.Client requires cert + key in same file)
+                    if (!string.IsNullOrEmpty(_tlsConfig.PfxFile))
+                    {
+                        cert = new X509Certificate2(_tlsConfig.PfxFile, _tlsConfig.PfxPassword);
+                    }
+                    else
+                    {
+                        cert = new X509Certificate2(_tlsConfig.CertFile);
+                    }
+
                     opts.AddCertificate(cert);
 
-                    // For self-signed certificates, skip server name verification
-                    // Set global callback before any connection is established
+                    // For self-signed certificates, skip server certificate validation
+                    // The connection is still encrypted with TLS
                     if (_tlsConfig.InsecureSkipVerify)
                     {
-                        System.Net.ServicePointManager.ServerCertificateValidationCallback =
+                        opts.TLSRemoteCertificationValidationCallback =
                             (sender, certificate, chain, sslPolicyErrors) =>
                             {
                                 // Skip validation for self-signed certificates

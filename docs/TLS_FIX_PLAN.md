@@ -7,13 +7,15 @@
 | SDK | TLS 配置 | 问题 | 初始状态 |
 |-----|----------|------|----------|
 | Go | `InsecureSkipVerify: true` (硬编码) | 无法选择是否跳过验证 | 可用 |
-| C# | 仅设置 `Secure = true` | 缺少跳过服务器名称验证选项 | TLS 握手失败 |
+| C# | 仅设置 `Secure = true` | 缺少 PFX 证书支持 + 跳过验证选项 | TLS 握手失败 |
 | Python | `ssl.create_default_context` | 导入错误 + 缺少跳过验证选项 | 不可用 |
 
 ### 根本原因
 
 1. **Go SDK**: `InsecureSkipVerify: true` 硬编码在 `CreateTLSOption` 中，用户无法选择是否验证服务器名称
-2. **C# SDK**: NATS.Client 库没有提供直接的 API 来跳过 TLS 证书验证
+2. **C# SDK**:
+   - NATS.Client 库要求证书和私钥在同一个 PFX 文件中
+   - 缺少 `TLSRemoteCertificationValidationCallback` 配置
 3. **Python SDK**:
    - 导入错误：`NotFoundError` 在新版 nats-py 中已被重命名
    - 缺少跳过服务器名称验证的选项
@@ -42,40 +44,88 @@ tlsConfig := &tls.Config{
 
 ---
 
-### ⚠️ C# SDK - 需要替代方案
+### ✅ C# SDK - 已修复
 
-**当前状态**: TLS 握手失败
+**当前状态**: 已修复并验证可用
 
-**问题**: NATS.Client 库的 `Options` 类没有提供以下属性：
-- `TLSRemoteCertValidationCallback` (不存在)
-- `ServerCertificateValidationCallback` (不存在)
+**问题**:
+1. NATS.Client 要求证书和私钥在同一个 PFX 文件中
+2. 需要配置 `TLSRemoteCertificationValidationCallback` 跳过证书验证
 
-**尝试的解决方案** (均失败):
-1. `opts.TLSRemoteCertValidationCallback` - 属性不存在
-2. `opts.ServerCertificateValidationCallback` - 属性不存在
-3. `System.Net.ServicePointManager.ServerCertificateValidationCallback` - 仅适用于 HTTP
+**修复内容**:
 
-**替代方案**:
+#### 1. TLSConfig 添加 PFX 支持
+**文件**: `sdk/csharp/LightLink/TLSConfig.cs`
 
-#### 方案 A: 使用环境变量 (推荐)
-```bash
-# 设置环境变量跳过 .NET TLS 验证
-set DOTNET_SSL_CERT_DIR=none
-set DOTNET_SSL_SKIP_CERT_VALIDATION=1
-dotnet run
+```csharp
+public class TLSConfig
+{
+    public string CaFile { get; set; } = "";
+    public string CertFile { get; set; } = "";
+    public string KeyFile { get; set; } = "";
+
+    /// <summary>
+    /// PFX certificate file (contains both cert and key).
+    /// NATS.Client requires PFX format for TLS connections.
+    /// If provided, takes precedence over CertFile/KeyFile.
+    /// </summary>
+    public string PfxFile { get; set; } = "";
+
+    /// <summary>
+    /// Password for PFX file.
+    /// </summary>
+    public string PfxPassword { get; set; } = "";
+
+    public bool InsecureSkipVerify { get; set; } = true;
+}
 ```
 
-#### 方案 B: 升级证书
-重新生成包含 SAN (Subject Alternative Name) 的证书，而不是仅使用 CN
+#### 2. Service.cs 支持 PFX 和证书验证回调
+**文件**: `sdk/csharp/LightLink/Service.cs`
 
-#### 方案 C: 使用不同的 NATS 客户端库
-考虑使用支持自定义 TLS 验证的 NATS 客户端
+```csharp
+// Prefer PFX format (NATS.Client requires cert + key in same file)
+if (!string.IsNullOrEmpty(_tlsConfig.PfxFile))
+{
+    cert = new X509Certificate2(_tlsConfig.PfxFile, _tlsConfig.PfxPassword);
+}
+else
+{
+    cert = new X509Certificate2(_tlsConfig.CertFile);
+}
 
-**已完成的修改**:
-- [x] 添加 `InsecureSkipVerify` 属性到 `TLSConfig` (默认 `true`)
-- [x] 添加相关注释说明
+opts.AddCertificate(cert);
 
-**文件**: `sdk/csharp/LightLink/TLSConfig.cs`
+// Skip server certificate validation for self-signed certificates
+if (_tlsConfig.InsecureSkipVerify)
+{
+    opts.TLSRemoteCertificationValidationCallback =
+        (sender, certificate, chain, sslPolicyErrors) => true;
+}
+```
+
+#### 3. 证书转换
+生成 PFX 文件:
+```bash
+openssl pkcs12 -export -out client/client.pfx \
+    -inkey client/client.key \
+    -in client/client.crt \
+    -passout pass:lightlink
+```
+
+#### 4. CertDiscovery 自动查找 PFX
+更新 `CheckCertDirectory` 方法，优先查找 `.pfx` 文件：
+```csharp
+var pfxFile = Path.Combine(dir, certType == "client" ? "client.pfx" : "server.pfx");
+
+// Prefer PFX format for NATS.Client
+if (File.Exists(pfxFile))
+{
+    return new CertDiscoveryResult { PfxFile = pfxFile, ... };
+}
+```
+
+**验证结果**: ✅ C# 服务成功启动并注册到管理平台
 
 ---
 
@@ -148,22 +198,39 @@ python main.py
 - 方法数: 4 (add, multiply, power, divide)
 - 实例: 1 个在线
 
-### C# SDK ⚠️
+### C# SDK ✅
 
 ```bash
 cd light_link_platform/examples/provider/csharp/MathService
 dotnet run
 ```
 
-**结果**: TLS 握手失败
+**结果**: 服务成功启动！
 
 ```
-NATS.Client.NATSConnectionException: TLS Authentication error
----> System.Security.Authentication.AuthenticationException:
-    Authentication failed because the remote party sent a TLS alert: 'HandshakeFailure'.
-```
+=== C# Metadata Registration Demo ===
+[1/5] Discovering TLS certificates...
+Certificates found:
+  CA:   ../../../../client\ca.crt
+  Cert: ../../../../client\client.crt
+  Key:  ../../../../client\client.key
 
-**需要**: 使用替代方案或升级证书
+[2/5] Creating service...
+[3/5] Registering methods with metadata...
+  - add: registered
+  - multiply: registered
+  - power: registered
+  - divide: registered
+
+[4/5] Starting service...
+Service started successfully!
+
+[5/5] Registering service metadata...
+Service metadata registered to NATS!
+  Service: math-service-csharp
+  Version: v1.0.0
+  Methods: 4
+```
 
 ---
 
@@ -183,16 +250,11 @@ NATS.Client.NATSConnectionException: TLS Authentication error
 
 ## 后续工作
 
-### 高优先级
-1. **C# SDK**: 确定并实施替代方案
-   - 测试环境变量方案
-   - 或升级证书包含 SAN
-
 ### 中优先级
-2. **Go SDK**: 使 `InsecureSkipVerify` 可配置
+1. **Go SDK**: 使 `InsecureSkipVerify` 可配置
 
 ### 低优先级
-3. **文档更新**:
+2. **文档更新**:
    - 各 SDK 的 README
    - TLS 配置说明
    - 示例代码注释
@@ -206,9 +268,12 @@ NATS.Client.NATSConnectionException: TLS Authentication error
 - `sdk/python/lightlink/service.py` - 使用 verify 参数
 - `light_link_platform/examples/provider/python/math_service/main.py` - 添加路径、修改调用顺序
 
-### C# SDK (部分完成)
-- `sdk/csharp/LightLink/TLSConfig.cs` - 添加 InsecureSkipVerify 属性
-- `sdk/csharp/LightLink/Service.cs` - 添加注释说明
+### C# SDK (已完成)
+- `sdk/csharp/LightLink/TLSConfig.cs` - 添加 PFX/PfxPassword/InsecureSkipVerify 属性
+- `sdk/csharp/LightLink/Service.cs` - PFX 证书加载、TLSRemoteCertificationValidationCallback
+- `sdk/csharp/LightLink/TLSConfig.cs` - CertDiscovery 查找 PFX 文件
+- `light_link_platform/client/client.pfx` - 生成的 PFX 证书文件
+- `light_link_platform/examples/provider/csharp/MathService/Program.cs` - 完整实现 4 个方法
 
 ### Go SDK (未修改)
 - 当前可用，但硬编码了 `InsecureSkipVerify: true`

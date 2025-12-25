@@ -12,6 +12,19 @@ namespace LightLink
         public string CertFile { get; set; } = "";
         public string KeyFile { get; set; } = "";
         public string ServerName { get; set; } = "nats-server";
+
+        /// <summary>
+        /// PFX certificate file (contains both cert and key).
+        /// NATS.Client requires PFX format for TLS connections.
+        /// If provided, takes precedence over CertFile/KeyFile.
+        /// </summary>
+        public string PfxFile { get; set; } = "";
+
+        /// <summary>
+        /// Password for PFX file.
+        /// </summary>
+        public string PfxPassword { get; set; } = "";
+
         /// <summary>
         /// Skip server certificate name verification for self-signed certificates.
         /// The connection is still encrypted with TLS, and CA chain is verified.
@@ -28,6 +41,8 @@ namespace LightLink
         public string CaFile { get; set; } = "";
         public string CertFile { get; set; } = "";
         public string KeyFile { get; set; } = "";
+        public string PfxFile { get; set; } = "";
+        public string PfxPassword { get; set; } = "lightlink";
         public string ServerName { get; set; } = "nats-server";
         public bool Found { get; set; }
     }
@@ -99,7 +114,23 @@ namespace LightLink
             var certFile = Path.Combine(dir, certType == "client" ? "client.crt" : "server.crt");
             var keyFile = Path.Combine(dir, certType == "client" ? "client.key" : "server.key");
             var caFile = Path.Combine(dir, "ca.crt");
+            var pfxFile = Path.Combine(dir, certType == "client" ? "client.pfx" : "server.pfx");
 
+            // Prefer PFX format for NATS.Client
+            if (File.Exists(pfxFile))
+            {
+                return new CertDiscoveryResult
+                {
+                    CaFile = caFile,
+                    CertFile = certFile,
+                    KeyFile = keyFile,
+                    PfxFile = pfxFile,
+                    ServerName = DefaultServerName,
+                    Found = true
+                };
+            }
+
+            // Fallback to separate cert/key files
             if (File.Exists(caFile) && File.Exists(certFile) && File.Exists(keyFile))
             {
                 return new CertDiscoveryResult
@@ -125,6 +156,8 @@ namespace LightLink
                 CaFile = result.CaFile,
                 CertFile = result.CertFile,
                 KeyFile = result.KeyFile,
+                PfxFile = result.PfxFile,
+                PfxPassword = result.PfxPassword,
                 ServerName = result.ServerName
             };
         }
