@@ -59,3 +59,63 @@ func (d *Database) GetInstance(instanceKey string) (*Instance, error) {
 	}
 	return &inst, err
 }
+
+// GetInstancesByService retrieves all instances for a service
+func (d *Database) GetInstancesByService(serviceName string) ([]*Instance, error) {
+	query := `SELECT id, service_name, instance_key, language, host_ip, host_mac, working_dir, version, first_seen, last_heartbeat, online, created_at, updated_at FROM instances WHERE service_name = ? ORDER BY created_at DESC`
+	rows, err := d.db.Query(query, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var instances []*Instance
+	for rows.Next() {
+		var inst Instance
+		err := rows.Scan(&inst.ID, &inst.ServiceName, &inst.InstanceKey, &inst.Language,
+			&inst.HostIP, &inst.HostMAC, &inst.WorkingDir, &inst.Version,
+			&inst.FirstSeen, &inst.LastHeartbeat, &inst.Online, &inst.CreatedAt, &inst.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		instances = append(instances, &inst)
+	}
+	return instances, nil
+}
+
+// ListAllInstances retrieves all instances
+func (d *Database) ListAllInstances() ([]*Instance, error) {
+	query := `SELECT id, service_name, instance_key, language, host_ip, host_mac, working_dir, version, first_seen, last_heartbeat, online, created_at, updated_at FROM instances ORDER BY created_at DESC`
+	rows, err := d.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var instances []*Instance
+	for rows.Next() {
+		var inst Instance
+		err := rows.Scan(&inst.ID, &inst.ServiceName, &inst.InstanceKey, &inst.Language,
+			&inst.HostIP, &inst.HostMAC, &inst.WorkingDir, &inst.Version,
+			&inst.FirstSeen, &inst.LastHeartbeat, &inst.Online, &inst.CreatedAt, &inst.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		instances = append(instances, &inst)
+	}
+	return instances, nil
+}
+
+// DeleteInstance deletes an instance by its instance key
+func (d *Database) DeleteInstance(instanceKey string) error {
+	query := `DELETE FROM instances WHERE instance_key = ? AND online = 0`
+	result, err := d.db.Exec(query, instanceKey)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("instance not found or is online")
+	}
+	return nil
+}

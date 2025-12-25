@@ -3,6 +3,7 @@ package manager
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
@@ -109,7 +110,7 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 	r.eventCh <- &types.ServiceEvent{
 		Type:      eventType,
 		Service:   register.Metadata.Name,
-		Timestamp: register.Timestamp,
+		Timestamp: time.Unix(register.Timestamp, 0),
 	}
 }
 

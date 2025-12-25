@@ -13,17 +13,20 @@ import (
 
 // Handler handles API requests
 type Handler struct {
-	db      *storage.Database
-	manager *manager.Manager
-	auth    *auth.AuthMiddleware
+	db         *storage.Database
+	manager    *manager.Manager
+	auth       *auth.AuthMiddleware
+	controller *manager.Controller
 }
 
 // NewHandler creates a new API handler
 func NewHandler(db *storage.Database, mgr *manager.Manager, auth *auth.AuthMiddleware) *Handler {
+	ctrl := manager.NewController(mgr)
 	return &Handler{
-		db:      db,
-		manager: mgr,
-		auth:    auth,
+		db:         db,
+		manager:    mgr,
+		auth:       auth,
+		controller: ctrl,
 	}
 }
 
@@ -47,6 +50,10 @@ func (h *Handler) Routes() http.Handler {
 
 	// Call endpoint
 	mux.HandleFunc("/api/call", h.withAuth(h.handleCall))
+
+	// Instance endpoints
+	mux.HandleFunc("/api/instances", h.withAuth(h.handleInstances))
+	mux.HandleFunc("/api/instances/", h.withAuth(h.handleInstanceRouter))
 
 	// WebSocket endpoint (auth handled separately)
 	mux.HandleFunc("/api/ws", h.handleWebSocket)
@@ -332,4 +339,141 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// TODO: Implement WebSocket upgrade
 	// This will be handled by the Hub
 	sendJSONError(w, http.StatusNotImplemented, "WebSocket not yet implemented")
+}
+
+// handleInstances handles instance list requests
+func (h *Handler) handleInstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		h.listInstances(w, r)
+	} else {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleInstanceRouter routes /api/instances/ requests to appropriate handlers
+func (h *Handler) handleInstanceRouter(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 {
+		sendJSONError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+
+	instanceKey := parts[3]
+
+	// Check if it's a control request: /api/instances/{key}/stop or /restart
+	if len(parts) >= 5 {
+		action := parts[4]
+		if action == "stop" {
+			h.stopInstance(w, r, instanceKey)
+			return
+		}
+		if action == "restart" {
+			h.restartInstance(w, r, instanceKey)
+			return
+		}
+	}
+
+	// Check if it's a DELETE request for deleting offline instance
+	if r.Method == http.MethodDelete {
+		h.deleteOfflineInstance(w, r, instanceKey)
+		return
+	}
+
+	// Otherwise, it's an instance detail request: /api/instances/{key}
+	h.getInstanceDetail(w, r, instanceKey)
+}
+
+// listInstances lists all instances or instances for a specific service
+func (h *Handler) listInstances(w http.ResponseWriter, r *http.Request) {
+	serviceName := r.URL.Query().Get("service")
+
+	var instances []*storage.Instance
+	var err error
+
+	if serviceName != "" {
+		instances, err = h.controller.ListInstances(serviceName)
+	} else {
+		instances, err = h.controller.ListAllInstances()
+	}
+
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to get instances")
+		return
+	}
+
+	sendJSON(w, instances)
+}
+
+// getInstanceDetail retrieves a specific instance
+func (h *Handler) getInstanceDetail(w http.ResponseWriter, r *http.Request, instanceKey string) {
+	if r.Method != http.MethodGet {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	instance, err := h.controller.GetInstance(instanceKey)
+	if err != nil {
+		sendJSONError(w, http.StatusNotFound, "Instance not found")
+		return
+	}
+
+	sendJSON(w, instance)
+}
+
+// stopInstance stops a specific instance (POST /api/instances/{key}/stop)
+func (h *Handler) stopInstance(w http.ResponseWriter, r *http.Request, instanceKey string) {
+	if r.Method != http.MethodPost {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	if !auth.IsAdmin(r) {
+		sendJSONError(w, http.StatusForbidden, "Admin access required")
+		return
+	}
+
+	if err := h.controller.StopInstance(instanceKey); err != nil {
+		sendJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	sendJSON(w, map[string]string{"status": "stopping", "instance": instanceKey})
+}
+
+// restartInstance restarts a specific instance (POST /api/instances/{key}/restart)
+func (h *Handler) restartInstance(w http.ResponseWriter, r *http.Request, instanceKey string) {
+	if r.Method != http.MethodPost {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	if !auth.IsAdmin(r) {
+		sendJSONError(w, http.StatusForbidden, "Admin access required")
+		return
+	}
+
+	if err := h.controller.RestartInstance(instanceKey); err != nil {
+		sendJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	sendJSON(w, map[string]string{"status": "restarting", "instance": instanceKey})
+}
+
+// deleteOfflineInstance deletes an offline instance (DELETE /api/instances/{key})
+func (h *Handler) deleteOfflineInstance(w http.ResponseWriter, r *http.Request, instanceKey string) {
+	if !auth.IsAdmin(r) {
+		sendJSONError(w, http.StatusForbidden, "Admin access required")
+		return
+	}
+
+	if err := h.controller.DeleteOfflineInstance(instanceKey); err != nil {
+		sendJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	sendJSON(w, map[string]string{"status": "deleted", "instance": instanceKey})
 }

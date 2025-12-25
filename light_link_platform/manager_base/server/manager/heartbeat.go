@@ -73,10 +73,12 @@ func (h *HeartbeatMonitor) handleHeartbeat(msg *nats.Msg) {
 	}
 	log.Printf("[Heartbeat] Service: %s, Version: %s", heartbeat.Service, heartbeat.Version)
 
+	timestamp := time.Unix(heartbeat.Timestamp, 0)
+
 	// Update last seen time
 	h.mu.Lock()
 	_ = h.lastSeen[heartbeat.Service].IsZero() || time.Since(h.lastSeen[heartbeat.Service]) < h.timeout
-	h.lastSeen[heartbeat.Service] = heartbeat.Timestamp
+	h.lastSeen[heartbeat.Service] = timestamp
 	h.mu.Unlock()
 
 	// Update database status
@@ -89,7 +91,7 @@ func (h *HeartbeatMonitor) handleHeartbeat(msg *nats.Msg) {
 		h.eventCh <- &types.ServiceEvent{
 			Type:      "online",
 			Service:   heartbeat.Service,
-			Timestamp: heartbeat.Timestamp,
+			Timestamp: timestamp,
 		}
 	}
 
@@ -97,7 +99,7 @@ func (h *HeartbeatMonitor) handleHeartbeat(msg *nats.Msg) {
 	h.db.SaveEvent(&storage.ServiceEvent{
 		Type:      "heartbeat",
 		Service:   heartbeat.Service,
-		Timestamp: heartbeat.Timestamp,
+		Timestamp: timestamp,
 	})
 }
 
