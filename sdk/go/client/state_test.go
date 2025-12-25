@@ -12,20 +12,20 @@ func TestSetGetState(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server with JetStream:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
     // Set state
-    err = client.SetState("test.key", map[string]interface{}{"value": 123})
+    err = c.SetState("test.key", map[string]interface{}{"value": 123})
     if err != nil {
         t.Fatalf("SetState failed: %v", err)
     }
 
     // Get state
-    state, err := client.GetState("test.key")
+    state, err := c.GetState("test.key")
     if err != nil {
         t.Fatalf("GetState failed: %v", err)
     }
@@ -42,16 +42,16 @@ func TestWatchState(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server with JetStream:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
     changes := make(chan map[string]interface{}, 1)
 
     // Watch state changes
-    stop, err := client.WatchState("test.watch", func(state map[string]interface{}) {
+    stop, err := c.WatchState("test.watch", func(state map[string]interface{}) {
         changes <- state
     })
     if err != nil {
@@ -60,7 +60,7 @@ func TestWatchState(t *testing.T) {
     defer stop()
 
     // Modify state
-    client.SetState("test.watch", map[string]interface{}{"status": "updated"})
+    c.SetState("test.watch", map[string]interface{}{"status": "updated"})
 
     // Wait for notification
     select {

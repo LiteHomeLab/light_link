@@ -13,17 +13,17 @@ func TestWatchStateCleanup(t *testing.T) {
 		KeyFile:    "../../../deploy/nats/tls/demo-service.key",
 		ServerName: "nats-server",
 	}
-	client, err := NewClient("nats://172.18.200.47:4222", config)
+	c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
 	if err != nil {
 		t.Skip("Need running NATS server with JetStream")
 	}
-	defer client.Close()
+	defer c.Close()
 
 	// Use unique key name to avoid conflicts
 	uniqueKey := fmt.Sprintf("test.cleanup.%d", time.Now().UnixNano())
 
 	callCount := 0
-	stop, err := client.WatchState(uniqueKey, func(state map[string]interface{}) {
+	stop, err := c.WatchState(uniqueKey, func(state map[string]interface{}) {
 		callCount++
 	})
 	if err != nil {
@@ -31,7 +31,7 @@ func TestWatchStateCleanup(t *testing.T) {
 	}
 
 	// Trigger a state change
-	client.SetState(uniqueKey, map[string]interface{}{"value": 1})
+	c.SetState(uniqueKey, map[string]interface{}{"value": 1})
 	time.Sleep(100 * time.Millisecond)
 
 	// Stop watching
@@ -41,7 +41,7 @@ func TestWatchStateCleanup(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Trigger another change - handler should not be called
-	client.SetState(uniqueKey, map[string]interface{}{"value": 2})
+	c.SetState(uniqueKey, map[string]interface{}{"value": 2})
 	time.Sleep(100 * time.Millisecond)
 
 	if callCount != 1 {

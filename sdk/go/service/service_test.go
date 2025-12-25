@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewService(t *testing.T) {
-    svc, err := NewService("test-service", "nats://localhost:4222", nil)
+    svc, err := NewService("test-service", "nats://localhost:4222")
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -18,7 +18,7 @@ func TestNewService(t *testing.T) {
 }
 
 func TestRegisterRPC(t *testing.T) {
-    svc, err := NewService("test-service", "nats://localhost:4222", nil)
+    svc, err := NewService("test-service", "nats://localhost:4222")
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
@@ -40,7 +40,7 @@ func TestRegisterRPC(t *testing.T) {
 }
 
 func TestStartStop(t *testing.T) {
-    svc, err := NewService("test-service", "nats://localhost:4222", nil)
+    svc, err := NewService("test-service", "nats://localhost:4222")
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }

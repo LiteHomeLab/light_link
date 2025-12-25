@@ -12,13 +12,13 @@ func TestPublishSubscribe(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    subClient, err := NewClient("nats://172.18.200.47:4222", config)
+    subClient, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
     defer subClient.Close()
 
-    pubClient, err := NewClient("nats://172.18.200.47:4222", config)
+    pubClient, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }

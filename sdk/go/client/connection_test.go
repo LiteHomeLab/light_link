@@ -12,14 +12,14 @@ func TestNewClient(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
-    if client == nil {
+    if c == nil {
         t.Fatal("client is nil")
     }
-    client.Close()
+    c.Close()
 }
 
 func TestNewClientWithTLS(t *testing.T) {
@@ -31,13 +31,13 @@ func TestNewClientWithTLS(t *testing.T) {
     }
 
     // Note: This test requires certificates to exist
-    client, err := NewClient("tls://172.18.200.47:4222", config)
+    c, err := NewClient("tls://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         // Expected to fail without certificates, this is OK
         t.Logf("Expected failure without certs: %v", err)
         return
     }
-    defer client.Close()
+    defer c.Close()
     t.Log("Client created with TLS config")
 }
 
@@ -48,11 +48,11 @@ func TestClientClose(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
-    err = client.Close()
+    err = c.Close()
     if err != nil {
         t.Fatalf("Close failed: %v", err)
     }
@@ -65,13 +65,13 @@ func TestClientGetNATSConn(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
-    conn := client.GetNATSConn()
+    conn := c.GetNATSConn()
     if conn == nil {
         t.Fatal("NATS connection is nil")
     }

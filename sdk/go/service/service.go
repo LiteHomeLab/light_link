@@ -14,48 +14,87 @@ import (
 // RPCHandler RPC handler function type
 type RPCHandler func(args map[string]interface{}) (map[string]interface{}, error)
 
+// ServiceOption is a function that configures a Service
+type ServiceOption func(*Service) error
+
 // Service represents a service
 type Service struct {
-    name        string
-    nc          *nats.Conn
-    rpcMap      map[string]RPCHandler
-    rpcMutex    sync.RWMutex
-    metadata    *types.ServiceMetadata
-    metaMutex   sync.RWMutex
-    methodsMeta map[string]*types.MethodMetadata
-    running     bool
-    heartbeatStop chan struct{}
+	name          string
+	nc            *nats.Conn
+	tlsConfig     *client.TLSConfig
+	rpcMap        map[string]RPCHandler
+	rpcMutex      sync.RWMutex
+	metadata      *types.ServiceMetadata
+	metaMutex     sync.RWMutex
+	methodsMeta   map[string]*types.MethodMetadata
+	running       bool
+	heartbeatStop chan struct{}
 }
 
-// NewService creates a new service
-func NewService(name, natsURL string, tlsConfig *client.TLSConfig) (*Service, error) {
-    opts := []nats.Option{
-        nats.Name("LightLink Service: "+name),
-        nats.ReconnectWait(2 * time.Second),
-        nats.MaxReconnects(10),
-    }
+// WithServiceAutoTLS automatically discovers and uses server TLS certificates
+// Searches in ./nats-server directory
+func WithServiceAutoTLS() ServiceOption {
+	return func(s *Service) error {
+		result, err := types.DiscoverServerCerts()
+		if err != nil {
+			return fmt.Errorf("auto-discover server TLS failed: %w", err)
+		}
+		s.tlsConfig = &client.TLSConfig{
+			CaFile:     result.CaFile,
+			CertFile:   result.CertFile,
+			KeyFile:    result.KeyFile,
+			ServerName: result.ServerName,
+		}
+		return nil
+	}
+}
 
-    // Configure TLS
-    if tlsConfig != nil {
-        tlsOpt, err := client.CreateTLSOption(tlsConfig)
-        if err != nil {
-            return nil, err
-        }
-        opts = append(opts, tlsOpt)
-    }
+// WithServiceTLS uses the specified TLS configuration
+func WithServiceTLS(tlsConfig *client.TLSConfig) ServiceOption {
+	return func(s *Service) error {
+		s.tlsConfig = tlsConfig
+		return nil
+	}
+}
 
-    nc, err := nats.Connect(natsURL, opts...)
-    if err != nil {
-        return nil, err
-    }
+// NewService creates a new service with options
+func NewService(name, natsURL string, opts ...ServiceOption) (*Service, error) {
+	service := &Service{
+		name:          name,
+		rpcMap:        make(map[string]RPCHandler),
+		methodsMeta:   make(map[string]*types.MethodMetadata),
+		heartbeatStop: make(chan struct{}),
+	}
 
-    return &Service{
-        name:          name,
-        nc:            nc,
-        rpcMap:        make(map[string]RPCHandler),
-        methodsMeta:   make(map[string]*types.MethodMetadata),
-        heartbeatStop: make(chan struct{}),
-    }, nil
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(service); err != nil {
+			return nil, err
+		}
+	}
+
+	natsOpts := []nats.Option{
+		nats.Name("LightLink Service: "+name),
+		nats.ReconnectWait(2 * time.Second),
+		nats.MaxReconnects(10),
+	}
+
+	// Configure TLS
+	if service.tlsConfig != nil {
+		tlsOpt, err := client.CreateTLSOption(service.tlsConfig)
+		if err != nil {
+			return nil, err
+		}
+		natsOpts = append(natsOpts, tlsOpt)
+	}
+
+	nc, err := nats.Connect(natsURL, natsOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	service.nc = nc
+	return service, nil
 }
 
 // Name returns the service name

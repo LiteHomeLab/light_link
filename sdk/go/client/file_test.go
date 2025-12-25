@@ -12,11 +12,11 @@ func TestFileTransfer(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server with JetStream:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
     // Create test file
     tmpFile, err := os.CreateTemp("", "test-*.txt")
@@ -30,7 +30,7 @@ func TestFileTransfer(t *testing.T) {
     tmpFile.Close()
 
     // Upload file
-    fileID, err := client.UploadFile(tmpFile.Name(), "test.txt")
+    fileID, err := c.UploadFile(tmpFile.Name(), "test.txt")
     if err != nil {
         t.Fatalf("UploadFile failed: %v", err)
     }
@@ -43,7 +43,7 @@ func TestFileTransfer(t *testing.T) {
     defer os.Remove(outFile.Name())
     outFile.Close()
 
-    err = client.DownloadFile(fileID, outFile.Name())
+    err = c.DownloadFile(fileID, outFile.Name())
     if err != nil {
         t.Fatalf("DownloadFile failed: %v", err)
     }

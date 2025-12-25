@@ -54,38 +54,108 @@ certs-YYYY-MM-DD_HH-MM/
 
 ## 客户端连接配置
 
-### Go SDK
+所有 SDK 现在支持**自动证书发现**！只需将 `client/` 文件夹复制到项目目录即可使用。
 
+### 使用自动发现（推荐）
+
+**Go SDK:**
 ```go
+// 方式1: 使用 WithAutoTLS() 自动发现证书
+client, err := client.NewClient("tls://172.18.200.47:4222", client.WithAutoTLS())
+
+// 方式2: 使用 WithTLS() 手动指定
 tlsConfig := &client.TLSConfig{
     CaFile:     "client/ca.crt",
     CertFile:   "client/client.crt",
     KeyFile:    "client/client.key",
-    ServerName: "nats-server",  // 必须与服务器证书 CN 匹配
+    ServerName: "nats-server",
 }
-client, err := client.NewClient("tls://172.18.200.47:4222", tlsConfig)
+client, err := client.NewClient("tls://172.18.200.47:4222", client.WithTLS(tlsConfig))
 ```
 
-### Python SDK
-
+**Python SDK:**
 ```python
+# 方式1: 使用 auto_tls=True 自动发现证书
+client = Client(auto_tls=True)
+await client.connect()
+
+# 方式2: 使用 TLSConfig 手动指定
 tls_config = TLSConfig(
     ca_file="client/ca.crt",
     cert_file="client/client.crt",
     key_file="client/client.key",
-    server_name="nats-server"  # 必须与服务器证书 CN 匹配
+    server_name="nats-server"
 )
 client = Client(tls_config=tls_config)
 ```
 
-### C# SDK
-
+**C# SDK:**
 ```csharp
-Options opts = ConnectionFactory.GetDefaultOptions();
+// 方式1: 使用 CertDiscovery.GetAutoTLSConfig() 自动发现
+var tlsConfig = CertDiscovery.GetAutoTLSConfig();
+var opts = ConnectionFactory.GetDefaultOptions();
 opts.Url = "tls://172.18.200.47:4222";
-opts.SSL = true;
-opts.SetCertificate("client/ca.crt", "client/client.crt", "client/client.key");
+opts.SetCertificate(tlsConfig.CaFile, tlsConfig.CertFile, tlsConfig.KeyFile);
+
+// 方式2: 手动创建 TLSConfig
+var tlsConfig = new TLSConfig {
+    CaFile = "client/ca.crt",
+    CertFile = "client/client.crt",
+    KeyFile = "client/client.key",
+    ServerName = "nats-server"
+};
 ```
+
+### 服务端自动发现
+
+**Go SDK:**
+```go
+// 使用 WithServiceAutoTLS() 自动发现服务器证书
+service, err := service.NewService("my-service", "tls://172.18.200.47:4222", service.WithServiceAutoTLS())
+```
+
+**Python SDK:**
+```python
+# 使用 auto_tls=True 自动发现服务器证书
+service = Service(name="my-service", nats_url="tls://172.18.200.47:4222", auto_tls=True)
+await service.start()
+```
+
+### 证书搜索路径
+
+SDK 会在以下位置搜索证书：
+- `./client` 或 `./nats-server` (当前目录)
+- `../client` 或 `../nats-server` (上级目录)
+- `../../client` 或 `../../nats-server` (上上级目录)
+
+### 完整部署流程
+
+1. **生成证书:**
+   ```batch
+   cd deploy/nats/create_tls
+   setup-certs.bat
+   ```
+
+2. **部署证书:**
+   - 将 `certs-TIMESTAMP/nats-server/` 复制到 `deploy/nats/` 目录
+   - 将 `certs-TIMESTAMP/client/` 复制到你的服务项目目录
+
+3. **启动 NATS 服务器:**
+   ```batch
+   nats-server -c deploy/nats/nats-server.conf
+   ```
+
+4. **启动服务** (自动发现证书):
+   ```bash
+   # Go 服务
+   go run main.go
+
+   # Python 服务
+   python main.py
+
+   # C# 服务
+   dotnet run
+   ```
 
 ## 环境变量（可选）
 

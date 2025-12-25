@@ -1,58 +1,111 @@
 package client
 
 import (
-    "crypto/tls"
-    "crypto/x509"
-    "os"
-    "time"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"os"
+	"time"
 
-    "github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go"
+	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
 // TLSConfig TLS configuration
 type TLSConfig struct {
-    CaFile     string
-    CertFile   string
-    KeyFile    string
-    ServerName string
+	CaFile     string
+	CertFile   string
+	KeyFile    string
+	ServerName string
 }
+
+// Option is a function that configures a Client
+type Option func(*Client) error
 
 // Client represents a NATS client
 type Client struct {
-    nc *nats.Conn
+	nc        *nats.Conn
+	tlsConfig *TLSConfig
+	name      string
 }
 
-// NewClient creates a new client
-func NewClient(url string, tlsConfig *TLSConfig) (*Client, error) {
-    opts := []nats.Option{
-        nats.Name("LightLink Client"),
-        nats.ReconnectWait(2 * time.Second),
-        nats.MaxReconnects(10),
-        nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-            if err != nil {
-                println("Disconnected:", err.Error())
-            }
-        }),
-        nats.ReconnectHandler(func(nc *nats.Conn) {
-            println("Reconnected to", nc.ConnectedUrl())
-        }),
-    }
+// WithAutoTLS automatically discovers and uses TLS certificates
+// Searches in ./client directory
+func WithAutoTLS() Option {
+	return func(c *Client) error {
+		result, err := types.DiscoverClientCerts()
+		if err != nil {
+			return fmt.Errorf("auto-discover TLS failed: %w", err)
+		}
+		c.tlsConfig = &TLSConfig{
+			CaFile:     result.CaFile,
+			CertFile:   result.CertFile,
+			KeyFile:    result.KeyFile,
+			ServerName: result.ServerName,
+		}
+		return nil
+	}
+}
 
-    // Configure TLS
-    if tlsConfig != nil {
-        tlsOpt, err := CreateTLSOption(tlsConfig)
-        if err != nil {
-            return nil, err
-        }
-        opts = append(opts, tlsOpt)
-    }
+// WithTLS uses the specified TLS configuration
+func WithTLS(tlsConfig *TLSConfig) Option {
+	return func(c *Client) error {
+		c.tlsConfig = tlsConfig
+		return nil
+	}
+}
 
-    nc, err := nats.Connect(url, opts...)
-    if err != nil {
-        return nil, err
-    }
+// WithName sets the client name
+func WithName(name string) Option {
+	return func(c *Client) error {
+		c.name = name
+		return nil
+	}
+}
 
-    return &Client{nc: nc}, nil
+// NewClient creates a new client with options
+func NewClient(url string, opts ...Option) (*Client, error) {
+	client := &Client{
+		name: "LightLink Client",
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(client); err != nil {
+			return nil, err
+		}
+	}
+
+	natsOpts := []nats.Option{
+		nats.Name(client.name),
+		nats.ReconnectWait(2 * time.Second),
+		nats.MaxReconnects(10),
+		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+			if err != nil {
+				println("Disconnected:", err.Error())
+			}
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			println("Reconnected to", nc.ConnectedUrl())
+		}),
+	}
+
+	// Configure TLS
+	if client.tlsConfig != nil {
+		tlsOpt, err := CreateTLSOption(client.tlsConfig)
+		if err != nil {
+			return nil, err
+		}
+		natsOpts = append(natsOpts, tlsOpt)
+	}
+
+	nc, err := nats.Connect(url, natsOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	client.nc = nc
+	return client, nil
 }
 
 // CreateTLSOption creates a TLS option

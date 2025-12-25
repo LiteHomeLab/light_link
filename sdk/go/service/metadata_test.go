@@ -32,7 +32,7 @@ func TestRegisterMetadata(t *testing.T) {
 	}
 	defer sub.Unsubscribe()
 
-	svc, err := NewService("test-service", nats.DefaultURL, nil)
+	svc, err := NewService("test-service", nats.DefaultURL)
 	if err != nil {
 		t.Fatal("NewService failed:", err)
 	}
@@ -75,7 +75,7 @@ func TestRegisterMethodWithMetadata(t *testing.T) {
 	}
 	defer nc.Close()
 
-	svc, err := NewService("test-method-service", nats.DefaultURL, nil)
+	svc, err := NewService("test-method-service", nats.DefaultURL)
 	if err != nil {
 		t.Fatal("NewService failed:", err)
 	}
@@ -157,7 +157,7 @@ func TestHeartbeat(t *testing.T) {
 	}
 	defer sub.Unsubscribe()
 
-	svc, err := NewService("test-heartbeat", nats.DefaultURL, nil)
+	svc, err := NewService("test-heartbeat", nats.DefaultURL)
 	if err != nil {
 		t.Fatal("NewService failed:", err)
 	}
@@ -189,7 +189,7 @@ func TestHeartbeat(t *testing.T) {
 
 // TestBuildCurrentMetadata tests building metadata from registered methods
 func TestBuildCurrentMetadata(t *testing.T) {
-	svc, err := NewService("test-build-meta", nats.DefaultURL, nil)
+	svc, err := NewService("test-build-meta", nats.DefaultURL)
 	if err != nil {
 		t.Skip("NATS not available:", err)
 		return
@@ -238,7 +238,7 @@ func TestBuildCurrentMetadata(t *testing.T) {
 
 // TestGetSubjects tests subject generation
 func TestGetSubjects(t *testing.T) {
-	svc, err := NewService("test-subjects", nats.DefaultURL, nil)
+	svc, err := NewService("test-subjects", nats.DefaultURL)
 	if err != nil {
 		t.Fatal("NewService failed:", err)
 	}

@@ -13,14 +13,14 @@ func TestCall(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
     // Test calling non-existent service
-    result, err := client.Call("test-service", "testMethod", map[string]interface{}{"key": "value"})
+    result, err := c.Call("test-service", "testMethod", map[string]interface{}{"key": "value"})
     if err == nil {
         t.Error("Expected error for non-existent service")
     }
@@ -35,16 +35,16 @@ func TestCallWithTimeout(t *testing.T) {
         KeyFile:    "../../../deploy/nats/tls/demo-service.key",
         ServerName: "nats-server",
     }
-    client, err := NewClient("nats://172.18.200.47:4222", config)
+    c, err := NewClient("nats://172.18.200.47:4222", WithTLS(config))
     if err != nil {
         t.Skip("Need running NATS server:", err)
     }
-    defer client.Close()
+    defer c.Close()
 
     // Test timeout
     done := make(chan bool)
     go func() {
-        _, _ = client.Call("timeout-service", "slowMethod", nil)
+        _, _ = c.Call("timeout-service", "slowMethod", nil)
         done <- true
     }()
 

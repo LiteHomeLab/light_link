@@ -46,7 +46,7 @@ type chunkUploadState struct {
 
 // NewBackupService creates a new backup service
 func NewBackupService(name, natsURL string, tlsConfig *client.TLSConfig, storagePath string) (*BackupService, error) {
-	svc, err := NewService(name, natsURL, tlsConfig)
+	svc, err := NewService(name, natsURL, WithServiceTLS(tlsConfig))
 	if err != nil {
 		return nil, err
 	}
