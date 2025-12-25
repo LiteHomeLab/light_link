@@ -29,9 +29,12 @@ light_link/
 ├── light_link_platform/ # 管理平台和多语言示例服务
 │   ├── manager_base/    # 管理平台 (server + web)
 │   └── examples/        # 多语言示例服务
-│       ├── go/          # Go 示例服务
-│       ├── csharp/      # C# 示例服务
-│       └── python/      # Python 示例服务
+│       ├── provider/    # 服务提供者（被 manager_base 调用）
+│       │   ├── go/
+│       │   ├── csharp/
+│       │   └── python/
+│       └── caller/      # 服务使用者
+│           └── csharp/
 └── docs/                # 文档
 ```
 
@@ -46,11 +49,13 @@ light_link/
 7. 所有测试必须通过后才能提交
 8. **平台示例管理**: 所有管理平台和多语言示例服务统一放在 `light_link_platform/` 目录下
    - `manager_base/` - 管理平台（后端 + 前端在一个文件夹）
-   - `examples/` - 多语言示例服务
+   - `examples/provider/` - 服务提供者（被 manager_base 调用的服务）
      - `go/` - Go 示例服务
      - `csharp/` - C# 示例服务
      - `python/` - Python 示例服务
-   - 新增示例服务时，请放入对应的语言子目录
+   - `examples/caller/` - 服务使用者（调用其他服务或发布订阅消息）
+     - `csharp/` - C# 调用者示例
+   - 新增示例服务时，根据角色放入 provider 或 caller 目录
 
 ## NATS 服务配置
 
@@ -111,15 +116,17 @@ cd light_link_platform/manager_base/server
 go run main.go
 # 访问 http://localhost:8080
 
-# 启动 Go 示例服务
-cd light_link_platform/examples/go/metadata-demo
+# 启动 Provider 服务（被管理平台调用）
+cd light_link_platform/examples/provider/go/math-service
 go run main.go
 
-# 启动 C# 示例服务
-cd light_link_platform/examples/csharp/TextServiceDemo
+cd light_link_platform/examples/provider/csharp/MathService
 dotnet run
 
-# 启动 Python 示例服务
-cd light_link_platform/examples/python
-python data_service.py
+cd light_link_platform/examples/provider/python/math_service
+python main.py
+
+# 启动 Caller 示例（调用其他服务）
+cd light_link_platform/examples/caller/csharp/PubSubDemo
+dotnet run
 ```

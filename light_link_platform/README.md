@@ -13,21 +13,19 @@ light_link_platform/
 │   └── README.md      # 平台文档
 │
 └── examples/          # 多语言示例服务
-    ├── go/            # Go 示例服务
-    │   ├── metadata-demo/      # 元数据注册演示
-    │   └── metadata-client/    # 元数据查询客户端演示
+    ├── provider/      # 服务提供者（被 manager_base 调用）
+    │   ├── go/
+    │   │   └── math-service/     # Go 数学服务
+    │   ├── csharp/
+    │   │   ├── MathService/      # C# 数学服务
+    │   │   └── TextService/      # C# 文本服务
+    │   └── python/
+    │       ├── math_service/     # Python 数学服务
+    │       └── data_service/     # Python 数据服务
     │
-    ├── csharp/        # C# 示例服务
-    │   ├── MetadataDemo/       # 元数据注册演示
-    │   ├── TextServiceDemo/    # 文本处理服务
-    │   ├── RpcDemo/            # RPC 演示
-    │   └── PubSubDemo.cs       # 发布订阅演示
-    │
-    └── python/        # Python 示例服务
-        ├── metadata_demo.py    # 元数据注册演示
-        ├── data_service.py     # 数据处理服务
-        ├── rpc_service.py      # RPC 服务演示
-        └── rpc_service_tls.py  # 支持 TLS 的 RPC 服务
+    └── caller/        # 服务使用者
+        └── csharp/
+            └── PubSubDemo/       # C# 发布订阅示例
 ```
 
 ## 快速开始
@@ -49,31 +47,55 @@ go run main.go
 
 ### 3. 运行示例服务
 
-**Go 元数据服务：**
+**服务提供者 (Provider):**
+
 ```bash
-cd examples/go/metadata-demo
+# Go 数学服务
+cd examples/provider/go/math-service
 go run main.go
-```
 
-**C# 文本服务：**
-```bash
-cd examples/csharp/TextServiceDemo
+# C# 数学服务
+cd examples/provider/csharp/MathService
 dotnet run
+
+# C# 文本服务
+cd examples/provider/csharp/TextService
+dotnet run
+
+# Python 数学服务
+cd examples/provider/python/math_service
+python main.py
+
+# Python 数据服务
+cd examples/provider/python/data_service
+python main.py
 ```
 
-**Python 数据服务：**
+**服务使用者 (Caller):**
+
 ```bash
-cd examples/python
-python data_service.py
+# C# 发布订阅示例
+cd examples/caller/csharp/PubSubDemo
+dotnet run
 ```
 
 ## 服务概览
 
+### Provider 服务（被管理平台调用）
+
 | 服务 | 语言 | 方法 |
 |------|------|------|
 | math-service | Go | add, multiply, power, divide |
+| math-service | C# | add |
 | csharp-text-service | C# | reverse, uppercase, wordcount |
+| math-service | Python | add, multiply, power, divide |
 | python-data-service | Python | filter, transform, aggregate |
+
+### Caller 示例
+
+| 项目 | 语言 | 说明 |
+|------|------|------|
+| PubSubDemo | C# | 消息发布订阅演示 |
 
 ## 开发说明
 

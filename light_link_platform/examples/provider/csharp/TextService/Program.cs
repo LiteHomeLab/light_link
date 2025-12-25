@@ -5,7 +5,7 @@ using LightLink;
 using LightLink.Metadata;
 using NATS.Client;
 
-namespace TextServiceDemo
+namespace TextService
 {
     class Program
     {

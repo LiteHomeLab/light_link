@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using LightLink;
 using LightLink.Metadata;
 
-namespace MetadataDemo
+namespace MathService
 {
     class Program
     {
