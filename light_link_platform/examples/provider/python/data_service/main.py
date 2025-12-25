@@ -6,6 +6,7 @@ from lightlink.metadata import (
     ServiceMetadata, MethodMetadata, ParameterMetadata,
     ReturnMetadata, ExampleMetadata
 )
+from lightlink.client import discover_client_certs, create_ssl_context_from_discovery
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,12 +46,32 @@ async def aggregate_handler(args: dict) -> dict:
 
 
 async def main():
-    # Try with just URL, no TLS
-    import os
-    nats_url = os.getenv("NATS_URL", "nats://172.18.200.47:4222")
-    svc = Service("python-data-service", nats_url)
+    print("=== Python Data Service ===")
+    print("\n[1/4] Discovering TLS certificates...")
+    try:
+        cert_result = discover_client_certs()
+        print(f"Certificates found:")
+        print(f"  CA:   {cert_result.ca_file}")
+        print(f"  Cert: {cert_result.cert_file}")
+        print(f"  Key:  {cert_result.key_file}")
+
+        # Create SSL context from discovered certificates
+        ssl_ctx = create_ssl_context_from_discovery(cert_result)
+
+        print("\n[2/4] Creating service with TLS...")
+        svc = Service(
+            "python-data-service",
+            "nats://172.18.200.47:4222",
+            tls_config=ssl_ctx,
+            auto_tls=False
+        )
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        print("Please copy the 'client/' folder to your service directory.")
+        return
 
     # Register filter method with metadata
+    print("\n[3/4] Registering methods...")
     filter_meta = MethodMetadata(
         name="filter",
         description="Filter numeric data by minimum value",
@@ -84,6 +105,7 @@ async def main():
         tags=["data", "filter"]
     )
     await svc.register_method_with_metadata("filter", filter_handler, filter_meta)
+    print("  - filter: registered")
 
     # Register transform method with metadata
     transform_meta = MethodMetadata(
@@ -119,6 +141,7 @@ async def main():
         tags=["data", "transform"]
     )
     await svc.register_method_with_metadata("transform", transform_handler, transform_meta)
+    print("  - transform: registered")
 
     # Register aggregate method with metadata
     aggregate_meta = MethodMetadata(
@@ -147,10 +170,12 @@ async def main():
         tags=["data", "aggregate", "statistics"]
     )
     await svc.register_method_with_metadata("aggregate", aggregate_handler, aggregate_meta)
+    print("  - aggregate: registered")
 
     await svc.start()
 
     # Build and register metadata
+    print("\n[4/4] Registering service metadata...")
     metadata = svc.build_current_metadata(
         version="1.0.0",
         description="Python Data Processing Service - Filter, transform and aggregate numeric data",
@@ -158,6 +183,10 @@ async def main():
         tags=["python", "data", "processing"]
     )
     await svc.register_metadata(metadata)
+    print(f"Service metadata registered to NATS!")
+    print(f"  Service: {metadata.name}")
+    print(f"  Version: {metadata.version}")
+    print(f"  Methods: {len(metadata.methods)}")
 
     logging.info("Python Data Service started and registered.")
     logging.info("Service: python-data-service")

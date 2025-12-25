@@ -5,7 +5,11 @@ server:
 nats:
   url: "nats://172.18.200.47:4222"
   tls:
-    enabled: false
+    enabled: true
+    ca: "../../client/ca.crt"
+    cert: "../../client/client.crt"
+    key: "../../client/client.key"
+    server_name: "nats-server"
 
 database:
   path: "data/light_link.db"

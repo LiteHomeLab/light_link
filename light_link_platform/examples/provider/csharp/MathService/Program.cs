@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using LightLink;
 using LightLink.Metadata;
+using NATS.Client;
 
 namespace MathService
 {
@@ -12,7 +13,30 @@ namespace MathService
         {
             Console.WriteLine("=== C# Metadata Registration Demo ===");
 
-            var svc = new Service("math-service", "nats://localhost:4222");
+            // Discover client certificates
+            Console.WriteLine("\n[1/4] Discovering TLS certificates...");
+            var tlsResult = LightLink.TLSConfig.CertDiscovery.DiscoverClientCerts();
+            if (!tlsResult.Found)
+            {
+                Console.WriteLine("ERROR: Client certificates not found!");
+                Console.WriteLine("Please copy the 'client/' folder to your service directory.");
+                return;
+            }
+            Console.WriteLine($"Certificates found:");
+            Console.WriteLine($"  CA:   {tlsResult.CaFile}");
+            Console.WriteLine($"  Cert: {tlsResult.CertFile}");
+            Console.WriteLine($"  Key:  {tlsResult.KeyFile}");
+
+            // Create NATS options with TLS
+            var opts = ConnectionFactory.GetDefaultOptions();
+            opts.Url = "nats://172.18.200.47:4222";
+
+            // Configure TLS
+            var tlsConfig = LightLink.TLSConfig.CertDiscovery.ToTLSConfig(tlsResult);
+            opts.SetCertificate(tlsConfig.CaFile, tlsConfig.CertFile, tlsConfig.KeyFile);
+            opts.Secure = true;
+
+            var svc = new Service("math-service", "nats://172.18.200.47:4222", opts);
 
             var addMeta = new MethodMetadata
             {

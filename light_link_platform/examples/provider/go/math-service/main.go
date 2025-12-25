@@ -15,9 +15,27 @@ func main() {
 	fmt.Println("=== Metadata Registration Demo ===")
 	fmt.Println("NATS URL:", config.NATSURL)
 
-	// Create service
-	fmt.Println("\n[1/4] Creating service...")
-	svc, err := service.NewService("math-service", config.NATSURL, nil)
+	// Auto-discover client certificates for TLS
+	fmt.Println("\n[1/4] Discovering TLS certificates...")
+	certResult, err := types.DiscoverClientCerts()
+	if err != nil {
+		log.Fatalf("Failed to discover client certificates: %v", err)
+	}
+	fmt.Printf("Certificates found:\n")
+	fmt.Printf("  CA:   %s\n", certResult.CaFile)
+	fmt.Printf("  Cert: %s\n", certResult.CertFile)
+	fmt.Printf("  Key:  %s\n", certResult.KeyFile)
+
+	tlsConfig := &types.TLSConfig{
+		CaFile:     certResult.CaFile,
+		CertFile:   certResult.CertFile,
+		KeyFile:    certResult.KeyFile,
+		ServerName: certResult.ServerName,
+	}
+
+	// Create service with TLS
+	fmt.Println("\n[2/5] Creating service...")
+	svc, err := service.NewService("math-service", config.NATSURL, service.WithServiceTLS(tlsConfig))
 	if err != nil {
 		log.Fatalf("Failed to create service: %v", err)
 	}
@@ -157,7 +175,7 @@ func main() {
 	}
 
 	// Register methods with metadata
-	fmt.Println("\n[2/4] Registering methods with metadata...")
+	fmt.Println("\n[3/5] Registering methods with metadata...")
 
 	if err := svc.RegisterMethodWithMetadata("add", addHandler, addMeta); err != nil {
 		log.Fatalf("Failed to register add: %v", err)
@@ -180,7 +198,7 @@ func main() {
 	fmt.Println("  - divide: registered")
 
 	// Build and register service metadata
-	fmt.Println("\n[3/4] Registering service metadata...")
+	fmt.Println("\n[4/5] Registering service metadata...")
 	metadata := svc.BuildCurrentMetadata(
 		"math-service",
 		"v1.0.0",
@@ -198,7 +216,7 @@ func main() {
 	fmt.Printf("  Methods: %d\n", len(metadata.Methods))
 
 	// Start service
-	fmt.Println("\n[4/4] Starting service...")
+	fmt.Println("\n[5/5] Starting service...")
 	if err := svc.Start(); err != nil {
 		log.Fatalf("Failed to start service: %v", err)
 	}

@@ -6,6 +6,7 @@ from lightlink.metadata import (
     MethodMetadata, ParameterMetadata,
     ReturnMetadata, ExampleMetadata
 )
+from lightlink.client import discover_client_certs, create_ssl_context_from_discovery
 
 logging.basicConfig(level=logging.INFO)
 
@@ -42,7 +43,29 @@ async def divide_handler(args: dict) -> dict:
 
 
 async def main():
-    svc = Service("math-service", "nats://localhost:4222")
+    print("=== Python Math Service ===")
+    print("\n[1/5] Discovering TLS certificates...")
+    try:
+        cert_result = discover_client_certs()
+        print(f"Certificates found:")
+        print(f"  CA:   {cert_result.ca_file}")
+        print(f"  Cert: {cert_result.cert_file}")
+        print(f"  Key:  {cert_result.key_file}")
+
+        # Create SSL context from discovered certificates
+        ssl_ctx = create_ssl_context_from_discovery(cert_result)
+
+        print("\n[2/5] Creating service with TLS...")
+        svc = Service(
+            "math-service",
+            "nats://172.18.200.47:4222",
+            tls_config=ssl_ctx,
+            auto_tls=False
+        )
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        print("Please copy the 'client/' folder to your service directory.")
+        return
 
     # Method metadata for add
     add_meta = MethodMetadata(
@@ -173,14 +196,45 @@ async def main():
     )
 
     # Register methods with metadata
+    print("\n[3/5] Registering methods with metadata...")
     await svc.register_method_with_metadata("add", add_handler, add_meta)
+    print("  - add: registered")
     await svc.register_method_with_metadata("multiply", multiply_handler, multiply_meta)
+    print("  - multiply: registered")
     await svc.register_method_with_metadata("power", power_handler, power_meta)
+    print("  - power: registered")
     await svc.register_method_with_metadata("divide", divide_handler, divide_meta)
+    print("  - divide: registered")
 
+    # Build and register service metadata
+    print("\n[4/5] Registering service metadata...")
+    metadata = svc.build_current_metadata(
+        version="v1.0.0",
+        description="A mathematical operations service providing basic and advanced math functions",
+        author="LiteHomeLab",
+        tags=["demo", "math", "calculator"]
+    )
+    await svc.register_metadata(metadata)
+    print(f"Service metadata registered to NATS!")
+    print(f"  Service: {metadata.name}")
+    print(f"  Version: {metadata.version}")
+    print(f"  Methods: {len(metadata.methods)}")
+
+    # Start service
+    print("\n[5/5] Starting service...")
     await svc.start()
+    print("Service started successfully!")
 
-    logging.info("Math service registered with 4 methods. Press Ctrl+C to stop...")
+    print("\n=== Service Information ===")
+    print(f"Service Name: {svc.name}")
+    print("Registered Methods:")
+    for name, meta in svc._method_metadata.items():
+        print(f"  - {name}: {meta.description}")
+
+    print("\n=== Math Service Complete ===")
+    print("\nThe service is now running and will send heartbeat every 30 seconds.")
+    print("Press Ctrl+C to stop the service.")
+
     try:
         await asyncio.Future()
     except KeyboardInterrupt:
