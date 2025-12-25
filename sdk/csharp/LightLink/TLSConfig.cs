@@ -46,7 +46,8 @@ namespace LightLink
                 "../client",
                 "../../client",
                 "../../../client",
-                "../../../../client"
+                "../../../../client",
+                "../../../../../client"
             };
 
             foreach (var path in searchPaths)
@@ -70,7 +71,8 @@ namespace LightLink
                 "../nats-server",
                 "../../nats-server",
                 "../../../nats-server",
-                "../../../../nats-server"
+                "../../../../nats-server",
+                "../../../../../nats-server"
             };
 
             foreach (var path in searchPaths)

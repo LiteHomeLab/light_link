@@ -35,6 +35,7 @@ def discover_client_certs() -> CertDiscoveryResult:
     3. ../../client
     4. ../../../client
     5. ../../../../client
+    6. ../../../../../client
 
     Returns:
         CertDiscoveryResult: Discovery result
@@ -47,7 +48,8 @@ def discover_client_certs() -> CertDiscoveryResult:
         "../client",
         "../../client",
         "../../../client",
-        "../../../../client"
+        "../../../../client",
+        "../../../../../client"
     ]
 
     for base_path in search_paths:
@@ -71,6 +73,7 @@ def discover_server_certs() -> CertDiscoveryResult:
     3. ../../nats-server
     4. ../../../nats-server
     5. ../../../../nats-server
+    6. ../../../../../nats-server
 
     Returns:
         CertDiscoveryResult: Discovery result
@@ -83,7 +86,8 @@ def discover_server_certs() -> CertDiscoveryResult:
         "../nats-server",
         "../../nats-server",
         "../../../nats-server",
-        "../../../../nats-server"
+        "../../../../nats-server",
+        "../../../../../nats-server"
     ]
 
     for base_path in search_paths:
