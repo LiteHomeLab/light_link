@@ -80,9 +80,9 @@ class Service:
 
         # Handle TLS configuration
         if self.auto_tls:
-            # Auto-discover server certificates
+            # Auto-discover server certificates (skip verify for self-signed certs)
             discovery_result = discover_server_certs()
-            ssl_ctx = create_ssl_context_from_discovery(discovery_result)
+            ssl_ctx = create_ssl_context_from_discovery(discovery_result, verify=False)
             await self.nc.connect(
                 self.nats_url,
                 tls=ssl_ctx,

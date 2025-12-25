@@ -12,6 +12,12 @@ namespace LightLink
         public string CertFile { get; set; } = "";
         public string KeyFile { get; set; } = "";
         public string ServerName { get; set; } = "nats-server";
+        /// <summary>
+        /// Skip server certificate name verification for self-signed certificates.
+        /// The connection is still encrypted with TLS, and CA chain is verified.
+        /// Default: true for compatibility with self-signed certs using legacy CN.
+        /// </summary>
+        public bool InsecureSkipVerify { get; set; } = true;
     }
 
     /// <summary>

@@ -1,4 +1,12 @@
 """Python Math Service - A complete math service with 4 methods"""
+import sys
+import os
+
+# Add SDK to path using absolute path
+sdk_path = r"C:\WorkSpace\Go2Hell\src\github.com\LiteHomeLab\light_link\sdk\python"
+if sdk_path not in sys.path:
+    sys.path.insert(0, sdk_path)
+
 import asyncio
 import logging
 from lightlink.service import Service
@@ -52,8 +60,8 @@ async def main():
         print(f"  Cert: {cert_result.cert_file}")
         print(f"  Key:  {cert_result.key_file}")
 
-        # Create SSL context from discovered certificates
-        ssl_ctx = create_ssl_context_from_discovery(cert_result)
+        # Create SSL context from discovered certificates (skip verify for self-signed certs)
+        ssl_ctx = create_ssl_context_from_discovery(cert_result, verify=False)
 
         print("\n[2/5] Creating service with TLS...")
         svc = Service(
@@ -206,8 +214,13 @@ async def main():
     await svc.register_method_with_metadata("divide", divide_handler, divide_meta)
     print("  - divide: registered")
 
-    # Build and register service metadata
-    print("\n[4/5] Registering service metadata...")
+    # Start service first (creates NATS connection)
+    print("\n[4/5] Starting service...")
+    await svc.start()
+    print("Service started successfully!")
+
+    # Build and register service metadata (requires NATS connection)
+    print("\n[5/5] Registering service metadata...")
     metadata = svc.build_current_metadata(
         version="v1.0.0",
         description="A mathematical operations service providing basic and advanced math functions",
@@ -219,11 +232,6 @@ async def main():
     print(f"  Service: {metadata.name}")
     print(f"  Version: {metadata.version}")
     print(f"  Methods: {len(metadata.methods)}")
-
-    # Start service
-    print("\n[5/5] Starting service...")
-    await svc.start()
-    print("Service started successfully!")
 
     print("\n=== Service Information ===")
     print(f"Service Name: {svc.name}")

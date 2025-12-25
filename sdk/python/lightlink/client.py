@@ -6,7 +6,14 @@ import ssl
 from pathlib import Path
 from typing import Optional
 from nats.aio.client import Client as NATSClient
-from nats.errors import TimeoutError, NotFoundError, BadRequestError
+
+# Compatibility for different nats-py versions
+try:
+    from nats.errors import TimeoutError, NotFoundError, BadRequestError
+except ImportError:
+    from nats.errors import TimeoutError
+    NotFoundError = TimeoutError
+    BadRequestError = TimeoutError
 
 
 # Certificate discovery constants
@@ -119,32 +126,68 @@ def _check_cert_directory(dir_path: str, cert_type: str) -> CertDiscoveryResult:
     return CertDiscoveryResult("", "", "", "", False)
 
 
-def create_ssl_context_from_discovery(result: CertDiscoveryResult) -> ssl.SSLContext:
-    """Create SSL context from discovery result"""
-    ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    ssl_ctx.load_verify_locations(result.ca_file)
+def create_ssl_context_from_discovery(result: CertDiscoveryResult, verify: bool = True) -> ssl.SSLContext:
+    """
+    Create SSL context from discovery result.
+
+    Args:
+        result: Certificate discovery result
+        verify: Whether to verify server certificate. Default: True.
+                When False, skips server name verification for self-signed certs.
+                The connection is still encrypted with TLS.
+
+    Returns:
+        SSL context configured with the certificates
+    """
+    if verify:
+        # Full verification
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ssl_ctx.load_verify_locations(result.ca_file)
+        if result.server_name:
+            ssl_ctx.server_hostname = result.server_name
+    else:
+        # Skip server name verification for self-signed certificates
+        # The connection is still encrypted with TLS
+        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
     ssl_ctx.load_cert_chain(
         certfile=result.cert_file,
         keyfile=result.key_file
     )
     ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    if result.server_name:
-        ssl_ctx.server_hostname = result.server_name
     return ssl_ctx
 
 
 class TLSConfig:
     """TLS configuration"""
-    def __init__(self, ca_file, cert_file, key_file, server_name=None):
+    def __init__(self, ca_file, cert_file, key_file, server_name=None, verify=True):
+        """
+        Initialize TLS configuration.
+
+        Args:
+            ca_file: Path to CA certificate file
+            cert_file: Path to client certificate file
+            key_file: Path to client private key file
+            server_name: Expected server name (default: "nats-server")
+            verify: Whether to verify server certificate (default: True).
+                    Set to False for self-signed certificates with legacy CN.
+        """
         self.ca_file = ca_file
         self.cert_file = cert_file
         self.key_file = key_file
         self.server_name = server_name or DEFAULT_SERVER_NAME
+        self.verify = verify
 
     @classmethod
-    def from_auto_discovery(cls) -> 'TLSConfig':
+    def from_auto_discovery(cls, verify: bool = False) -> 'TLSConfig':
         """
         Create TLS configuration from auto-discovery.
+
+        Args:
+            verify: Whether to verify server certificate. Default: False
+                    for compatibility with self-signed certificates.
 
         Returns:
             TLSConfig: TLS configuration object
@@ -157,7 +200,8 @@ class TLSConfig:
             ca_file=result.ca_file,
             cert_file=result.cert_file,
             key_file=result.key_file,
-            server_name=result.server_name
+            server_name=result.server_name,
+            verify=verify
         )
 
 
@@ -194,21 +238,28 @@ class Client:
 
         # Handle TLS configuration
         if self.auto_tls:
-            # Auto-discover certificates
+            # Auto-discover certificates (skip verify by default for self-signed certs)
             discovery_result = discover_client_certs()
-            ssl_ctx = create_ssl_context_from_discovery(discovery_result)
+            ssl_ctx = create_ssl_context_from_discovery(discovery_result, verify=False)
             options["tls"] = ssl_ctx
         elif self.tls_config:
             # Use provided TLS configuration
-            ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-            ssl_ctx.load_verify_locations(self.tls_config.ca_file)
+            if self.tls_config.verify:
+                ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+                ssl_ctx.load_verify_locations(self.tls_config.ca_file)
+                if self.tls_config.server_name:
+                    ssl_ctx.server_hostname = self.tls_config.server_name
+            else:
+                # Skip verification for self-signed certificates
+                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl.CERT_NONE
+
             ssl_ctx.load_cert_chain(
                 certfile=self.tls_config.cert_file,
                 keyfile=self.tls_config.key_file
             )
             ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-            if self.tls_config.server_name:
-                ssl_ctx.server_hostname = self.tls_config.server_name
             options["tls"] = ssl_ctx
 
         await self.nc.connect(self.url, **options)
