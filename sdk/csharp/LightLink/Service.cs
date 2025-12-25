@@ -17,9 +17,9 @@ namespace LightLink
     {
         private readonly string _name;
         private readonly string _natsURL;
-        private readonly Options _natsOptions;
+        private readonly Options? _natsOptions;
         private readonly TLSConfig? _tlsConfig;
-        private IConnection _nc;
+        private IConnection? _nc;
         private readonly Dictionary<string, RPCHandler> _rpcHandlers;
         private readonly ReaderWriterLockSlim _rpcLock;
         private readonly Dictionary<string, MethodMetadata> _methodMetadata;
@@ -41,7 +41,7 @@ namespace LightLink
         {
         }
 
-        public Service(string name, string natsURL, Options natsOptions, TLSConfig tlsConfig)
+        public Service(string name, string natsURL, Options? natsOptions, TLSConfig? tlsConfig)
         {
             _name = name;
             _natsURL = natsURL;
@@ -134,13 +134,18 @@ namespace LightLink
             _running = true;
         }
 
-        private void HandleRPC(object sender, MsgHandlerEventArgs e)
+        private void HandleRPC(object? sender, MsgHandlerEventArgs e)
         {
             var msg = e.Message;
             try
             {
                 string json = System.Text.Encoding.UTF8.GetString(msg.Data);
                 var request = JsonSerializer.Deserialize<RPCRequest>(json);
+                if (request == null)
+                {
+                    SendError(msg, "", "Invalid request: null");
+                    return;
+                }
 
                 _rpcLock.EnterReadLock();
                 if (!_rpcHandlers.TryGetValue(request.Method, out var handler))
@@ -243,6 +248,9 @@ namespace LightLink
         // RegisterMetadata - publish metadata to $LL.register.{service}
         public void RegisterMetadata(ServiceMetadata metadata)
         {
+            if (_nc == null)
+                throw new InvalidOperationException("Service not started. Call Start() first.");
+
             var msg = new
             {
                 service = _name,

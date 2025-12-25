@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using NATS.Client;
 using NATS.Client.JetStream;
 using LightLink;
+using System.Security.Cryptography.X509Certificates;
 
 namespace PubSubDemo
 {
@@ -14,17 +15,18 @@ namespace PubSubDemo
 
             // Discover client certificates
             Console.WriteLine("\n[1/3] Discovering TLS certificates...");
-            var tlsResult = LightLink.TLSConfig.CertDiscovery.DiscoverClientCerts();
+            var tlsResult = LightLink.CertDiscovery.DiscoverClientCerts();
             if (!tlsResult.Found)
             {
                 Console.WriteLine("ERROR: Client certificates not found!");
                 Console.WriteLine("Please copy the 'client/' folder to your service directory.");
                 return;
             }
+            var tlsConfig = LightLink.CertDiscovery.ToTLSConfig(tlsResult);
             Console.WriteLine($"Certificates found:");
-            Console.WriteLine($"  CA:   {tlsResult.CaFile}");
-            Console.WriteLine($"  Cert: {tlsResult.CertFile}");
-            Console.WriteLine($"  Key:  {tlsResult.KeyFile}");
+            Console.WriteLine($"  CA:   {tlsConfig.CaFile}");
+            Console.WriteLine($"  Cert: {tlsConfig.CertFile}");
+            Console.WriteLine($"  Key:  {tlsConfig.KeyFile}");
 
             // Create NATS connection with TLS
             Console.WriteLine("\n[2/3] Connecting to NATS with TLS...");
@@ -33,9 +35,21 @@ namespace PubSubDemo
             opts.Name = "C# PubSub Demo";
 
             // Configure TLS
-            var tlsConfig = LightLink.TLSConfig.CertDiscovery.ToTLSConfig(tlsResult);
-            opts.SetCertificate(tlsConfig.CaFile, tlsConfig.CertFile, tlsConfig.KeyFile);
             opts.Secure = true;
+            X509Certificate2 cert;
+            if (!string.IsNullOrEmpty(tlsConfig.PfxFile))
+            {
+                cert = new X509Certificate2(tlsConfig.PfxFile, tlsConfig.PfxPassword);
+            }
+            else
+            {
+                cert = new X509Certificate2(tlsConfig.CertFile);
+            }
+            opts.AddCertificate(cert);
+
+            // Skip server certificate validation for self-signed certificates
+            opts.TLSRemoteCertificationValidationCallback =
+                (sender, certificate, chain, sslPolicyErrors) => true;
 
             using var conn = new ConnectionFactory().CreateConnection(opts);
             Console.WriteLine("Connected to NATS server with TLS!");
