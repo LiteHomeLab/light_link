@@ -39,7 +39,7 @@ func TestDatabaseInit(t *testing.T) {
 	}
 
 	// Check other tables
-	tables := []string{"methods", "service_status", "events", "users", "call_history", "service_status_history"}
+	tables := []string{"methods", "service_status", "events", "users", "call_history", "service_status_history", "instances"}
 	for _, table := range tables {
 		err := db.db.QueryRow(`
 			SELECT name FROM sqlite_master
@@ -335,5 +335,111 @@ func TestListServiceStatus(t *testing.T) {
 
 	if len(statuses) != 2 {
 		t.Errorf("Expected 2 statuses, got %d", len(statuses))
+	}
+}
+
+func TestSaveInstance(t *testing.T) {
+	db := setupTestDB(t)
+
+	instance := &Instance{
+		ServiceName:   "math-service",
+		InstanceKey:   "192.168.1.100:aabbccddeeff:math-service",
+		Language:      "go",
+		HostIP:        "192.168.1.100",
+		HostMAC:       "aabbccddeeff",
+		WorkingDir:    "/home/user/services/math-service",
+		Version:       "v1.0.0",
+		Online:        true,
+		FirstSeen:     time.Now(),
+		LastHeartbeat: time.Now(),
+	}
+
+	err := db.SaveInstance(instance)
+	if err != nil {
+		t.Fatalf("SaveInstance failed: %v", err)
+	}
+
+	// Verify save success
+	saved, err := db.GetInstance(instance.InstanceKey)
+	if err != nil {
+		t.Fatalf("GetInstance failed: %v", err)
+	}
+	if saved.ServiceName != instance.ServiceName {
+		t.Errorf("expected %s, got %s", instance.ServiceName, saved.ServiceName)
+	}
+	if saved.InstanceKey != instance.InstanceKey {
+		t.Errorf("expected %s, got %s", instance.InstanceKey, saved.InstanceKey)
+	}
+	if saved.Language != instance.Language {
+		t.Errorf("expected %s, got %s", instance.Language, saved.Language)
+	}
+	if saved.HostIP != instance.HostIP {
+		t.Errorf("expected %s, got %s", instance.HostIP, saved.HostIP)
+	}
+	if saved.HostMAC != instance.HostMAC {
+		t.Errorf("expected %s, got %s", instance.HostMAC, saved.HostMAC)
+	}
+	if saved.WorkingDir != instance.WorkingDir {
+		t.Errorf("expected %s, got %s", instance.WorkingDir, saved.WorkingDir)
+	}
+	if saved.Version != instance.Version {
+		t.Errorf("expected %s, got %s", instance.Version, saved.Version)
+	}
+	if saved.Online != instance.Online {
+		t.Errorf("expected %v, got %v", instance.Online, saved.Online)
+	}
+}
+
+func TestSaveInstanceUpdate(t *testing.T) {
+	db := setupTestDB(t)
+
+	instance := &Instance{
+		ServiceName:   "math-service",
+		InstanceKey:   "192.168.1.100:aabbccddeeff:math-service",
+		Language:      "go",
+		HostIP:        "192.168.1.100",
+		HostMAC:       "aabbccddeeff",
+		WorkingDir:    "/home/user/services/math-service",
+		Version:       "v1.0.0",
+		Online:        true,
+		FirstSeen:     time.Now(),
+		LastHeartbeat: time.Now(),
+	}
+
+	// Save first time
+	err := db.SaveInstance(instance)
+	if err != nil {
+		t.Fatalf("SaveInstance failed: %v", err)
+	}
+
+	// Update the instance
+	instance.Version = "v1.1.0"
+	instance.Online = false
+	instance.LastHeartbeat = time.Now()
+
+	err = db.SaveInstance(instance)
+	if err != nil {
+		t.Fatalf("SaveInstance update failed: %v", err)
+	}
+
+	// Verify update
+	saved, err := db.GetInstance(instance.InstanceKey)
+	if err != nil {
+		t.Fatalf("GetInstance failed: %v", err)
+	}
+	if saved.Version != "v1.1.0" {
+		t.Errorf("expected version v1.1.0, got %s", saved.Version)
+	}
+	if saved.Online {
+		t.Errorf("expected online to be false, got true")
+	}
+}
+
+func TestGetInstanceNotFound(t *testing.T) {
+	db := setupTestDB(t)
+
+	_, err := db.GetInstance("nonexistent:instance:key")
+	if err == nil {
+		t.Error("Expected error for non-existent instance")
 	}
 }

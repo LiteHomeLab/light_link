@@ -112,6 +112,22 @@ func (d *Database) init() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS instances (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		service_name TEXT NOT NULL,
+		instance_key TEXT NOT NULL UNIQUE,
+		language TEXT NOT NULL,
+		host_ip TEXT NOT NULL,
+		host_mac TEXT NOT NULL,
+		working_dir TEXT NOT NULL,
+		version TEXT NOT NULL,
+		first_seen DATETIME NOT NULL,
+		last_heartbeat DATETIME NOT NULL,
+		online BOOLEAN NOT NULL DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	-- Indexes
 	CREATE INDEX IF NOT EXISTS idx_service_status_service_id ON service_status(service_id);
 	CREATE INDEX IF NOT EXISTS idx_service_status_history_service_id ON service_status_history(service_id);
@@ -120,6 +136,9 @@ func (d *Database) init() error {
 	CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_call_history_service_id ON call_history(service_id);
 	CREATE INDEX IF NOT EXISTS idx_call_history_called_at ON call_history(called_at);
+	CREATE INDEX IF NOT EXISTS idx_instances_instance_key ON instances(instance_key);
+	CREATE INDEX IF NOT EXISTS idx_instances_service_name ON instances(service_name);
+	CREATE INDEX IF NOT EXISTS idx_instances_online ON instances(online);
 	`
 
 	_, err := d.db.Exec(schema)
