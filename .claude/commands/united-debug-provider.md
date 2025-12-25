@@ -1,2 +1,4 @@
-我开发这个框架的功能，需要进行功能的测试和验收。
-想要启动 @light_link_platform\examples\provider\ 下面所有的服务提供者，和管理平台manager_base  @light_link_platform\manager_base\ （manager_base包含前、后端）的联合调试，你让这些启动的程序在后台运行。
+框架需要进行 provider 功能的测试和验收
+ - NATS 服务器，在 172.18.200.47:4222 已经启动
+ - 在后台启动 @light_link_platform\examples\provider\ 下面所有的服务提供者
+ - 在后台启动 管理平台 manager_base  @light_link_platform\manager_base\ （manager_base包含前、后端）

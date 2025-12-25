@@ -23,7 +23,10 @@ light_link_platform/
     │       ├── math_service/     # Python 数学服务
     │       └── data_service/     # Python 数据服务
     │
-    └── caller/        # 服务使用者
+    ├── caller/        # 服务调用者（调用 provider 的 RPC）
+    │   └── (待添加示例)
+    │
+    └── notify/        # 消息通知（发布订阅、状态管理）
         └── csharp/
             └── PubSubDemo/       # C# 发布订阅示例
 ```
@@ -47,7 +50,7 @@ go run main.go
 
 ### 3. 运行示例服务
 
-**服务提供者 (Provider):**
+**服务提供者 (Provider) - 被 manager_base 调用:**
 
 ```bash
 # Go 数学服务
@@ -71,13 +74,17 @@ cd examples/provider/python/data_service
 python main.py
 ```
 
-**服务使用者 (Caller):**
+**消息通知 (Notify) - 发布订阅、状态管理:**
 
 ```bash
 # C# 发布订阅示例
-cd examples/caller/csharp/PubSubDemo
+cd examples/notify/csharp/PubSubDemo
 dotnet run
 ```
+
+**服务调用者 (Caller) - 调用 provider 的 RPC:**
+
+> 待添加示例...
 
 ## 服务概览
 
@@ -91,11 +98,15 @@ dotnet run
 | math-service | Python | add, multiply, power, divide |
 | python-data-service | Python | filter, transform, aggregate |
 
-### Caller 示例
+### Notify 示例（消息通知）
 
 | 项目 | 语言 | 说明 |
 |------|------|------|
 | PubSubDemo | C# | 消息发布订阅演示 |
+
+### Caller 示例（RPC 调用）
+
+> 待添加示例...
 
 ## 开发说明
 

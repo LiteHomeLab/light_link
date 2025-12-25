@@ -33,8 +33,8 @@ light_link/
 │       │   ├── go/
 │       │   ├── csharp/
 │       │   └── python/
-│       └── caller/      # 服务使用者
-│           └── csharp/
+│       ├── caller/      # 服务调用者（调用 provider 的 RPC）
+│       └── notify/      # 消息通知（发布订阅、状态管理）
 └── docs/                # 文档
 ```
 
@@ -50,12 +50,18 @@ light_link/
 8. **平台示例管理**: 所有管理平台和多语言示例服务统一放在 `light_link_platform/` 目录下
    - `manager_base/` - 管理平台（后端 + 前端在一个文件夹）
    - `examples/provider/` - 服务提供者（被 manager_base 调用的服务）
-     - `go/` - Go 示例服务
-     - `csharp/` - C# 示例服务
-     - `python/` - Python 示例服务
-   - `examples/caller/` - 服务使用者（调用其他服务或发布订阅消息）
-     - `csharp/` - C# 调用者示例
-   - 新增示例服务时，根据角色放入 provider 或 caller 目录
+     - 注册 RPC 方法供其他服务调用
+     - 发送心跳维持服务状态
+   - `examples/caller/` - 服务调用者（调用 provider 的 RPC）
+     - 调用其他服务的 RPC 方法
+   - `examples/notify/` - 消息通知（发布订阅、状态管理）
+     - 发布订阅消息
+     - 状态管理（KV）
+     - 消息队列（JetStream）
+   - 新增示例时，根据功能选择正确的目录：
+     - 提供 RPC 服务 → provider/
+     - 调用 RPC 服务 → caller/
+     - 消息通知/状态管理 → notify/
 
 ## NATS 服务配置
 
@@ -126,7 +132,7 @@ dotnet run
 cd light_link_platform/examples/provider/python/math_service
 python main.py
 
-# 启动 Caller 示例（调用其他服务）
-cd light_link_platform/examples/caller/csharp/PubSubDemo
+# 启动 Notify 示例（发布订阅、状态管理）
+cd light_link_platform/examples/notify/csharp/PubSubDemo
 dotnet run
 ```
