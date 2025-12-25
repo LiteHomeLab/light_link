@@ -44,7 +44,9 @@ namespace LightLink
             {
                 DefaultClientCertDir,
                 "../client",
-                "../../client"
+                "../../client",
+                "../../../client",
+                "../../../../client"
             };
 
             foreach (var path in searchPaths)
@@ -66,7 +68,9 @@ namespace LightLink
             {
                 DefaultServerCertDir,
                 "../nats-server",
-                "../../nats-server"
+                "../../nats-server",
+                "../../../nats-server",
+                "../../../../nats-server"
             };
 
             foreach (var path in searchPaths)

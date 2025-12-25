@@ -83,12 +83,14 @@ type CertDiscoveryResult struct {
 }
 
 // DiscoverClientCerts 在默认位置自动发现客户端证书
-// 搜索顺序: ./client -> ../client -> ../../client
+// 搜索顺序: ./client -> ../client -> ../../client -> ../../../client -> ../../../../client
 func DiscoverClientCerts() (*CertDiscoveryResult, error) {
 	searchPaths := []string{
 		DefaultClientCertDir,
 		"../client",
 		"../../client",
+		"../../../client",
+		"../../../../client",
 	}
 
 	for _, basePath := range searchPaths {
@@ -102,12 +104,14 @@ func DiscoverClientCerts() (*CertDiscoveryResult, error) {
 }
 
 // DiscoverServerCerts 在默认位置自动发现服务器证书
-// 搜索顺序: ./nats-server -> ../nats-server -> ../../nats-server
+// 搜索顺序: ./nats-server -> ../nats-server -> ../../nats-server -> ../../../nats-server -> ../../../../nats-server
 func DiscoverServerCerts() (*CertDiscoveryResult, error) {
 	searchPaths := []string{
 		DefaultServerCertDir,
 		"../nats-server",
 		"../../nats-server",
+		"../../../nats-server",
+		"../../../../nats-server",
 	}
 
 	for _, basePath := range searchPaths {
