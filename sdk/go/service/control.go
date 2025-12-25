@@ -67,13 +67,16 @@ func (c *ControlHandler) Unsubscribe() {
 
 // handleControl handles a control message
 func (c *ControlHandler) handleControl(msg *nats.Msg) {
+	log.Printf("[Control] Received message on subject: %s", msg.Subject)
+	log.Printf("[Control] Message data: %s", string(msg.Data))
+
 	var control types.ControlMessage
 	if err := json.Unmarshal(msg.Data, &control); err != nil {
 		log.Printf("[Control] Failed to unmarshal control message: %v", err)
 		return
 	}
 
-	log.Printf("[Control] Received command: %s for instance: %s", control.Command, control.InstanceKey)
+	log.Printf("[Control] Received command: %s for instance: %s (my key: %s)", control.Command, control.InstanceKey, c.instanceKey)
 
 	// Check if this message is for this instance
 	if control.InstanceKey != c.instanceKey {

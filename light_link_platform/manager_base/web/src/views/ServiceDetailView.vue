@@ -106,26 +106,138 @@
         </div>
       </div>
     </el-card>
+
+    <!-- 实例列表卡片 -->
+    <el-card class="instances-card">
+      <template #header>
+        <div class="card-header">
+          <h3>实例列表</h3>
+          <el-button @click="loadInstances" :loading="instancesLoading" size="small">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </template>
+
+      <el-empty v-if="!serviceInstances.length" description="暂无实例" />
+
+      <el-collapse v-else v-model="activeInstances" accordion>
+        <el-collapse-item
+          v-for="instance in serviceInstances"
+          :key="instance.instance_key"
+          :name="instance.instance_key"
+        >
+          <template #title>
+            <div class="instance-title">
+              <el-badge
+                :value="instance.online ? '在线' : '离线'"
+                :type="instance.online ? 'success' : 'info'"
+              >
+                <span class="instance-name">
+                  {{ instance.language }} - {{ instance.host_ip }}
+                </span>
+              </el-badge>
+              <el-tag size="small" type="info" class="version-tag">
+                {{ instance.version }}
+              </el-tag>
+            </div>
+          </template>
+
+          <div class="instance-detail">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="实例 Key">
+                <code>{{ instance.instance_key }}</code>
+              </el-descriptions-item>
+              <el-descriptions-item label="语言">
+                <el-tag :type="getLanguageTagType(instance.language)">
+                  {{ instance.language }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="主机 IP">
+                {{ instance.host_ip }}
+              </el-descriptions-item>
+              <el-descriptions-item label="主机 MAC">
+                {{ instance.host_mac }}
+              </el-descriptions-item>
+              <el-descriptions-item label="工作目录" :span="2">
+                <code>{{ instance.working_dir }}</code>
+              </el-descriptions-item>
+              <el-descriptions-item label="首次发现">
+                {{ formatDateTime(instance.first_seen) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="最后心跳">
+                {{ formatDateTime(instance.last_heartbeat) }}
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <!-- 控制按钮区域 (仅管理员可见) -->
+            <div class="instance-controls" v-if="isAdmin">
+              <el-button
+                type="warning"
+                size="small"
+                @click.stop="handleStop(instance)"
+                :disabled="!instance.online"
+              >
+                <el-icon><VideoPause /></el-icon>
+                停止
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                @click.stop="handleRestart(instance)"
+                :disabled="!instance.online"
+              >
+                <el-icon><RefreshRight /></el-icon>
+                重启
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                @click.stop="handleDelete(instance)"
+                :disabled="instance.online"
+              >
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Refresh } from '@element-plus/icons-vue'
-import { servicesApi, type ServiceMetadata, type MethodMetadata, type ServiceStatus } from '@/api'
-import { ElMessage } from 'element-plus'
-import { useServicesStore } from '@/stores'
+import { Refresh, VideoPause, RefreshRight, Delete } from '@element-plus/icons-vue'
+import { servicesApi, type ServiceMetadata, type MethodMetadata, type ServiceStatus, type Instance } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useServicesStore, useInstancesStore, useUserStore } from '@/stores'
 
 const route = useRoute()
 const router = useRouter()
 const servicesStore = useServicesStore()
+const instancesStore = useInstancesStore()
+const userStore = useUserStore()
 
 const serviceName = computed(() => route.params.name as string)
 const service = ref<ServiceMetadata | null>(null)
 const methods = ref<MethodMetadata[]>([])
 const serviceStatus = ref<ServiceStatus | null>(null)
 const loading = ref(false)
+const instancesLoading = ref(false)
+const activeInstances = ref<string[]>([])
+
+// 当前服务的实例列表
+const serviceInstances = computed(() => {
+  return instancesStore.getInstancesByService(serviceName.value)
+})
+
+// 是否管理员
+const isAdmin = computed(() => {
+  return userStore.role === 'admin'
+})
 
 function goBack() {
   router.push('/services')
@@ -142,6 +254,79 @@ function formatDate(dateStr: string) {
 
 function formatJSON(obj: any) {
   return JSON.stringify(obj, null, 2)
+}
+
+// 加载实例数据
+async function loadInstances() {
+  instancesLoading.value = true
+  try {
+    await instancesStore.loadServiceInstances(serviceName.value)
+  } catch (error: any) {
+    ElMessage.error('加载实例列表失败')
+  } finally {
+    instancesLoading.value = false
+  }
+}
+
+// 停止实例
+async function handleStop(instance: Instance) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要停止实例 ${instance.instance_key} 吗?`,
+      '确认操作',
+      { type: 'warning' }
+    )
+    await instancesStore.stopInstance(instance.instance_key)
+    await loadInstances()
+  } catch {
+    // 用户取消
+  }
+}
+
+// 重启实例
+async function handleRestart(instance: Instance) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要重启实例 ${instance.instance_key} 吗?`,
+      '确认操作',
+      { type: 'warning' }
+    )
+    await instancesStore.restartInstance(instance.instance_key)
+    await loadInstances()
+  } catch {
+    // 用户取消
+  }
+}
+
+// 删除实例
+async function handleDelete(instance: Instance) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除离线实例 ${instance.instance_key} 吗? 此操作不可恢复。`,
+      '确认删除',
+      { type: 'error', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+    await instancesStore.deleteInstance(instance.instance_key)
+  } catch {
+    // 用户取消
+  }
+}
+
+// 语言标签颜色
+function getLanguageTagType(language: string) {
+  const types: Record<string, string> = {
+    go: 'success',
+    python: 'warning',
+    csharp: 'danger',
+    javascript: 'primary'
+  }
+  return types[language] || 'info'
+}
+
+// 日期时间格式化
+function formatDateTime(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN')
 }
 
 async function loadData() {
@@ -172,6 +357,7 @@ async function loadData() {
 
 onMounted(() => {
   loadData()
+  loadInstances()
 })
 </script>
 
@@ -297,5 +483,54 @@ onMounted(() => {
   margin: 0;
   font-size: 12px;
   overflow-x: auto;
+}
+
+/* 实例卡片样式 */
+.instances-card {
+  margin-top: 20px;
+}
+
+.instances-card h3 {
+  margin: 0;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.instance-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.instance-name {
+  font-weight: 500;
+}
+
+.version-tag {
+  margin-left: auto;
+}
+
+.instance-detail {
+  padding: 10px 0;
+}
+
+.instance-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.instance-controls code {
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
 }
 </style>

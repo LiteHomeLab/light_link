@@ -119,3 +119,17 @@ func (d *Database) DeleteInstance(instanceKey string) error {
 	}
 	return nil
 }
+
+// UpdateInstanceOnline updates the online status of an instance
+func (d *Database) UpdateInstanceOnline(instanceKey string, online bool) error {
+	query := `UPDATE instances SET online = ?, updated_at = CURRENT_TIMESTAMP WHERE instance_key = ?`
+	result, err := d.db.Exec(query, online, instanceKey)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("instance not found: %s", instanceKey)
+	}
+	return nil
+}

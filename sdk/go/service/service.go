@@ -51,6 +51,24 @@ func WithServiceAutoTLS() ServiceOption {
 	}
 }
 
+// WithServiceClientAutoTLS automatically discovers and uses client TLS certificates
+// Searches in ./client directory
+func WithServiceClientAutoTLS() ServiceOption {
+	return func(s *Service) error {
+		result, err := types.DiscoverClientCerts()
+		if err != nil {
+			return fmt.Errorf("auto-discover client TLS failed: %w", err)
+		}
+		s.tlsConfig = &client.TLSConfig{
+			CaFile:     result.CaFile,
+			CertFile:   result.CertFile,
+			KeyFile:    result.KeyFile,
+			ServerName: result.ServerName,
+		}
+		return nil
+	}
+}
+
 // WithServiceTLS uses the specified TLS configuration
 func WithServiceTLS(tlsConfig *client.TLSConfig) ServiceOption {
 	return func(s *Service) error {

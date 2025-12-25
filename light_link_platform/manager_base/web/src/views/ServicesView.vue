@@ -84,6 +84,12 @@
               <el-icon><Calendar /></el-icon>
               <span>注册: {{ formatDate(service.registered_at) }}</span>
             </div>
+
+            <div class="info-row">
+              <el-tag size="small" type="info">
+                实例: {{ getInstanceOnlineCount(service.name) }}/{{ getInstanceTotalCount(service.name) }}
+              </el-tag>
+            </div>
           </div>
 
           <template #footer>
@@ -116,11 +122,12 @@ import {
   PriceTag,
   Calendar
 } from '@element-plus/icons-vue'
-import { useServicesStore } from '@/stores'
+import { useServicesStore, useInstancesStore } from '@/stores'
 import { storeToRefs } from 'pinia'
 
 const router = useRouter()
 const servicesStore = useServicesStore()
+const instancesStore = useInstancesStore()
 const { services, servicesStatus, loading } = storeToRefs(servicesStore)
 
 const search = ref('')
@@ -162,6 +169,15 @@ const offlineCount = computed(() => {
   }).length
 })
 
+// 实例统计计算属性
+const getInstanceOnlineCount = (serviceName: string) => {
+  return instancesStore.getOnlineCount(serviceName)
+}
+
+const getInstanceTotalCount = (serviceName: string) => {
+  return instancesStore.getTotalCount(serviceName)
+}
+
 // 方法
 const status = (name: string) => {
   return servicesStatus.value.get(name)
@@ -179,6 +195,7 @@ const viewService = (name: string) => {
 const loadData = () => {
   servicesStore.loadServices()
   servicesStore.loadStatus()
+  instancesStore.loadInstances()
 }
 
 // 生命周期

@@ -132,6 +132,32 @@ export interface CallResult {
   durationMs?: number
 }
 
+// 实例相关类型定义
+export interface Instance {
+  id: number
+  service_name: string
+  instance_key: string
+  language: string          // 语言类型: go, python, csharp, javascript
+  host_ip: string           // 部署服务器 IP
+  host_mac: string          // 部署服务器 MAC
+  working_dir: string       // 工作目录
+  version: string
+  first_seen: string        // ISO 8601 格式时间戳
+  last_heartbeat: string    // ISO 8601 格式时间戳
+  online: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface InstanceControlResponse {
+  status: 'stopping' | 'restarting' | 'deleted'
+  instance: string
+}
+
+export interface InstanceListParams {
+  service?: string  // 按服务名称筛选
+}
+
 // ============ API 方法 ============
 
 // 认证相关
@@ -163,6 +189,29 @@ export const eventsApi = {
 // 调用相关
 export const callApi = {
   call: (data: CallRequest) => api.post<CallResult>('/call', data) as unknown as Promise<CallResult>
+}
+
+// 实例相关 API
+export const instancesApi = {
+  // 获取实例列表
+  list: (params?: InstanceListParams) =>
+    api.get<Instance[]>('/instances', { params }) as unknown as Promise<Instance[]>,
+
+  // 获取单个实例详情
+  get: (key: string) =>
+    api.get<Instance>(`/instances/${encodeURIComponent(key)}`) as unknown as Promise<Instance>,
+
+  // 停止实例 (管理员权限)
+  stop: (key: string) =>
+    api.post<InstanceControlResponse>(`/instances/${encodeURIComponent(key)}/stop`) as unknown as Promise<InstanceControlResponse>,
+
+  // 重启实例 (管理员权限)
+  restart: (key: string) =>
+    api.post<InstanceControlResponse>(`/instances/${encodeURIComponent(key)}/restart`) as unknown as Promise<InstanceControlResponse>,
+
+  // 删除离线实例 (管理员权限)
+  delete: (key: string) =>
+    api.delete<InstanceControlResponse>(`/instances/${encodeURIComponent(key)}`) as unknown as Promise<InstanceControlResponse>
 }
 
 // WebSocket client

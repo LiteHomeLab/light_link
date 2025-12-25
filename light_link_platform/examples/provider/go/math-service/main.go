@@ -16,7 +16,7 @@ func main() {
 	fmt.Println("NATS URL:", config.NATSURL)
 
 	// Auto-discover client certificates for TLS
-	fmt.Println("\n[1/4] Discovering TLS certificates...")
+	fmt.Println("\n[1/5] Discovering TLS certificates...")
 	certResult, err := types.DiscoverClientCerts()
 	if err != nil {
 		log.Fatalf("Failed to discover client certificates: %v", err)
@@ -26,16 +26,9 @@ func main() {
 	fmt.Printf("  Cert: %s\n", certResult.CertFile)
 	fmt.Printf("  Key:  %s\n", certResult.KeyFile)
 
-	tlsConfig := &types.TLSConfig{
-		CaFile:     certResult.CaFile,
-		CertFile:   certResult.CertFile,
-		KeyFile:    certResult.KeyFile,
-		ServerName: certResult.ServerName,
-	}
-
-	// Create service with TLS
+	// Create service with auto-discovered TLS
 	fmt.Println("\n[2/5] Creating service...")
-	svc, err := service.NewService("math-service", config.NATSURL, service.WithServiceTLS(tlsConfig))
+	svc, err := service.NewService("math-service", config.NATSURL, service.WithServiceClientAutoTLS())
 	if err != nil {
 		log.Fatalf("Failed to create service: %v", err)
 	}

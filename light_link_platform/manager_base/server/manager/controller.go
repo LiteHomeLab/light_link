@@ -45,7 +45,18 @@ func (c *Controller) StopInstance(instanceKey string) error {
 		Timestamp:   time.Now().Unix(),
 	}
 
-	return c.sendControlMessage(&controlMsg)
+	if err := c.sendControlMessage(&controlMsg); err != nil {
+		return err
+	}
+
+	// Immediately mark instance as offline in database
+	if err := c.db.UpdateInstanceOnline(instanceKey, false); err != nil {
+		log.Printf("[Controller] Failed to update instance status: %v", err)
+		// Don't fail the operation if status update fails
+		// The service is already stopped
+	}
+
+	return nil
 }
 
 // RestartInstance restarts a specific service instance
@@ -149,12 +160,21 @@ func (c *Controller) sendControlMessage(msg *types.ControlMessage) error {
 		return fmt.Errorf("marshal control message: %w", err)
 	}
 
-	subject := fmt.Sprintf("$LL.control.%s", msg.Service)
-	log.Printf("[Controller] Sending %s command to %s (instance: %s)",
-		msg.Command, subject, msg.InstanceKey)
+	// Try multiple subject formats to ensure message is received
+	subjects := []string{
+		fmt.Sprintf("$LL.control.%s", msg.Service),
+		fmt.Sprintf("$LL.control.%s.>", msg.Service),
+	}
 
-	if err := c.nc.Publish(subject, data); err != nil {
-		return fmt.Errorf("publish control message: %w", err)
+	for _, subject := range subjects {
+		log.Printf("[Controller] Sending %s command to %s (instance: %s)",
+			msg.Command, subject, msg.InstanceKey)
+
+		if err := c.nc.Publish(subject, data); err != nil {
+			log.Printf("[Controller] Failed to publish to %s: %v", subject, err)
+			continue
+		}
+		log.Printf("[Controller] Successfully published to %s", subject)
 	}
 
 	return nil

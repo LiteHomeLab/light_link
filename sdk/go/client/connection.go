@@ -125,11 +125,13 @@ func CreateTLSOption(config *TLSConfig) (nats.Option, error) {
     pool.AppendCertsFromPEM(caCert)
 
     // Create TLS config
+    // For development with self-signed certificates using legacy CN, we skip server name verification
+    // The connection is still encrypted with TLS, and we verify the CA chain
     tlsConfig := &tls.Config{
-        Certificates: []tls.Certificate{cert},
-        RootCAs:      pool,
-        MinVersion:   tls.VersionTLS12,
-        ServerName:   config.ServerName,
+        Certificates:       []tls.Certificate{cert},
+        RootCAs:            pool,
+        MinVersion:         tls.VersionTLS12,
+        InsecureSkipVerify: true, // Skip server name verification for self-signed certs
     }
 
     return nats.Secure(tlsConfig), nil

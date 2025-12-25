@@ -96,6 +96,24 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 		}
 	}
 
+	// Save or update instance record
+	instanceKey := buildInstanceKey(register.InstanceInfo.HostIP, register.InstanceInfo.HostMAC, register.Metadata.Name)
+	instance := &storage.Instance{
+		ServiceName:   register.Metadata.Name,
+		InstanceKey:   instanceKey,
+		Language:      register.InstanceInfo.Language,
+		HostIP:        register.InstanceInfo.HostIP,
+		HostMAC:       register.InstanceInfo.HostMAC,
+		WorkingDir:    register.InstanceInfo.WorkingDir,
+		Version:       register.Version,
+		FirstSeen:     time.Now(),
+		LastHeartbeat: time.Now(),
+		Online:        true,
+	}
+	if err := r.db.SaveInstance(instance); err != nil {
+		log.Printf("[Registry] Failed to save instance: %v", err)
+	}
+
 	// Update status to online
 	if err := r.db.UpdateServiceStatus(register.Metadata.Name, true, register.Version); err != nil {
 		log.Printf("[Registry] Failed to update status: %v", err)
@@ -143,4 +161,20 @@ func convertExample(example *types.ExampleMetadata) *types.ExampleMetadata {
 		Output:      example.Output,
 		Description: example.Description,
 	}
+}
+
+// normalizeMAC removes colons and dashes from MAC address for use as lock key
+func normalizeMAC(mac string) string {
+	result := make([]byte, 0, len(mac))
+	for _, c := range mac {
+		if c != ':' && c != '-' {
+			result = append(result, byte(c))
+		}
+	}
+	return string(result)
+}
+
+// buildInstanceKey builds the unique instance key from IP, MAC, and service name
+func buildInstanceKey(ip, mac, serviceName string) string {
+	return ip + ":" + normalizeMAC(mac) + ":" + serviceName
 }
