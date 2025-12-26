@@ -113,3 +113,59 @@ math-service-go:
   - 等待依赖满足
   - 执行 RPC 调用
 - `run.bat` - Windows 启动脚本
+
+### call-math-service (Python)
+
+调用 math-service-go 提供的数学计算服务的 Python 示例程序。
+
+**功能特性：**
+- 依赖检查：启动前检查所需的服务和方法是否已注册
+- 自动等待：如果依赖未满足，自动等待服务注册
+- RPC 调用：调用多个数学计算方法
+- 错误处理：优雅处理服务不可用的情况
+
+**运行方式：**
+
+```bash
+# 1. 确保已启动 math-service-go
+cd light_link_platform/examples/provider/go/math-service-go
+go run main.go
+
+# 2. 运行 Python caller 示例
+cd light_link_platform/examples/caller/python/call-math-service
+python main.py
+
+# Or on Windows
+run.bat
+```
+
+**输出示例：**
+
+```
+[call-math-service-python] === Call Math Service Demo (Python) ===
+[call-math-service-python] NATS URL: nats://172.18.200.47:4222
+[call-math-service-python] Discovering TLS certificates...
+[call-math-service-python] Certificates found: ./client/client.crt
+[call-math-service-python] Connecting to NATS...
+[call-math-service-python] Connected successfully
+
+[call-math-service-python] Checking dependencies...
+[call-math-service-python] Checking for math-service-go... (2s)
+[call-math-service-python] ✓ math-service-go is available
+[call-math-service-python] All dependencies satisfied!
+
+[call-math-service-python] === Starting calculations ===
+[call-math-service-python] add(10, 20) = {'result': 30}
+[call-math-service-python] multiply(5, 6) = {'result': 30}
+[call-math-service-python] power(2, 10) = {'result': 1024}
+[call-math-service-python] divide(100, 4) = {'result': 25}
+[call-math-service-python] Complex: multiply(3, 4) = 12, then add(12, 10) = 22
+
+[call-math-service-python] === Demo complete ===
+```
+
+**代码结构：**
+
+- `main.py` - 主程序入口
+- `run.bat` - Windows 启动脚本
+- `README.md` - 详细文档
