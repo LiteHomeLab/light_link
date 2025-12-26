@@ -63,6 +63,48 @@ namespace LightLink.Tests
             client.Close();
         }
 
+        [Fact]
+        public async Task Client_PublishSubscribe_ShouldReceiveMessage()
+        {
+            // Arrange
+            var client = new Client("nats://localhost:4222");
+            await client.ConnectAsync();
+
+            var subject = "test.pubsub";
+            var received = false;
+            var receivedData = new Dictionary<string, object>();
+
+            // Subscribe first
+            using (var sub = client.Subscribe(subject, (data) =>
+            {
+                received = true;
+                receivedData = data;
+            }))
+            {
+                // Wait for subscription to be ready
+                await Task.Delay(100);
+
+                // Act
+                client.Publish(subject, new Dictionary<string, object>
+                {
+                    { "message", "Hello, LightLink!" },
+                    { "count", 42 }
+                });
+
+                // Wait for message
+                await Task.Delay(200);
+
+                // Assert
+                Assert.True(received);
+                Assert.True(receivedData.ContainsKey("message"));
+                Assert.Equal("Hello, LightLink!", receivedData["message"]);
+                Assert.Equal(42, receivedData["count"]);
+            }
+
+            // Cleanup
+            client.Close();
+        }
+
         public void Dispose()
         {
             // Cleanup code
