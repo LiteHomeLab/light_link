@@ -140,6 +140,46 @@ namespace LightLink.Tests
             client.Close();
         }
 
+        [Fact]
+        public async Task Client_UploadDownloadFile_ShouldTransferFile()
+        {
+            // Arrange
+            var client = new Client("nats://localhost:4222");
+            await client.ConnectAsync();
+
+            // Create test file
+            var testFile = "test_upload.txt";
+            var downloadFile = "test_download.txt";
+            var testContent = "Hello, LightLink File Transfer!";
+            await System.IO.File.WriteAllTextAsync(testFile, testContent);
+
+            try
+            {
+                // Act - Upload
+                var fileId = client.UploadFile(testFile, "remote.txt");
+                Assert.NotNull(fileId);
+                Assert.NotEmpty(fileId);
+
+                await Task.Delay(100); // Allow time for upload
+
+                // Act - Download
+                client.DownloadFile(fileId, downloadFile);
+
+                await Task.Delay(100); // Allow time for download
+
+                // Assert
+                var downloadedContent = await System.IO.File.ReadAllTextAsync(downloadFile);
+                Assert.Equal(testContent, downloadedContent);
+            }
+            finally
+            {
+                // Cleanup
+                if (System.IO.File.Exists(testFile)) System.IO.File.Delete(testFile);
+                if (System.IO.File.Exists(downloadFile)) System.IO.File.Delete(downloadFile);
+                client.Close();
+            }
+        }
+
         public void Dispose()
         {
             // Cleanup code
