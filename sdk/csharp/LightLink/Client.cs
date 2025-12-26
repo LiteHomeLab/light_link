@@ -16,6 +16,7 @@ namespace LightLink
         private TLSConfig? _tlsConfig;
         private IConnection? _nc;
         private Dictionary<string, string>? _stateCache;
+        private Dictionary<string, byte[]>? _fileStore;
 
         /// <summary>
         /// Create a new client
@@ -27,6 +28,7 @@ namespace LightLink
             _url = url;
             _tlsConfig = tlsConfig;
             _stateCache = new Dictionary<string, string>();
+            _fileStore = new Dictionary<string, byte[]>();
         }
 
         /// <summary>
@@ -219,6 +221,74 @@ namespace LightLink
                 return result ?? new Dictionary<string, object>();
             }
             return new Dictionary<string, object>();
+        }
+
+        /// <summary>
+        /// Upload file to Object Store
+        /// Note: This is a simplified implementation using in-memory store.
+        /// For production use with NATS JetStream, upgrade to NATS.Net.Client.
+        /// </summary>
+        public string UploadFile(string filePath, string remoteName)
+        {
+            string fileId = Guid.NewGuid().ToString();
+            byte[] fileData = System.IO.File.ReadAllBytes(filePath);
+
+            // Store in memory
+            if (_fileStore != null)
+            {
+                _fileStore[fileId] = fileData;
+            }
+
+            // Publish metadata notification
+            var metadata = new Dictionary<string, object>
+            {
+                { "file_id", fileId },
+                { "file_name", remoteName },
+                { "file_size", fileData.Length }
+            };
+
+            try
+            {
+                Publish("file.uploaded", metadata);
+            }
+            catch
+            {
+                // Ignore publish errors
+            }
+
+            return fileId;
+        }
+
+        /// <summary>
+        /// Upload file asynchronously
+        /// </summary>
+        public async System.Threading.Tasks.Task<string> UploadFileAsync(string filePath, string remoteName)
+        {
+            return await System.Threading.Tasks.Task.Run(() => UploadFile(filePath, remoteName));
+        }
+
+        /// <summary>
+        /// Download file from Object Store
+        /// Note: This is a simplified implementation using in-memory store.
+        /// For production use with NATS JetStream, upgrade to NATS.Net.Client.
+        /// </summary>
+        public void DownloadFile(string fileId, string localPath)
+        {
+            if (_fileStore == null)
+                throw new InvalidOperationException("File store not initialized");
+
+            if (!_fileStore.TryGetValue(fileId, out var fileData))
+                throw new FileNotFoundException($"File with ID {fileId} not found");
+
+            System.IO.File.WriteAllBytes(localPath, fileData);
+        }
+
+        /// <summary>
+        /// Download file asynchronously
+        /// </summary>
+        public async System.Threading.Tasks.Task DownloadFileAsync(string fileId, string localPath)
+        {
+            await System.Threading.Tasks.Task.Run(() => DownloadFile(fileId, localPath));
         }
 
         private void ConfigureTLS(Options opts)
