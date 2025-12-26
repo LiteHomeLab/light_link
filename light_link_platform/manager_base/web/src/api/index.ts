@@ -172,7 +172,11 @@ export const servicesApi = {
   getMethods: (name: string) => api.get<MethodMetadata[]>(`/services/${name}/methods`) as unknown as Promise<MethodMetadata[]>,
   getMethod: (service: string, method: string) =>
     api.get<MethodMetadata>(`/services/${service}/methods/${method}`) as unknown as Promise<MethodMetadata>,
-  delete: (name: string) => api.delete<{message: string}>(`/services/${name}`) as unknown as Promise<{message: string}>
+  delete: (name: string) => api.delete<{message: string}>(`/services/${name}`) as unknown as Promise<{message: string}>,
+  getOpenAPI: (name: string, format: 'json' | 'yaml' = 'json') =>
+    api.get(`/services/${name}/openapi?format=${format}`, {
+      responseType: format === 'yaml' ? 'text' : 'json'
+    })
 }
 
 // 状态相关
