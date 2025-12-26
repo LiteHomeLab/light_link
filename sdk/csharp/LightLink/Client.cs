@@ -15,6 +15,7 @@ namespace LightLink
         private string _url;
         private TLSConfig? _tlsConfig;
         private IConnection? _nc;
+        private Dictionary<string, string>? _stateCache;
 
         /// <summary>
         /// Create a new client
@@ -25,6 +26,7 @@ namespace LightLink
         {
             _url = url;
             _tlsConfig = tlsConfig;
+            _stateCache = new Dictionary<string, string>();
         }
 
         /// <summary>
@@ -177,6 +179,46 @@ namespace LightLink
                     // Ignore JSON deserialization errors
                 }
             });
+        }
+
+        /// <summary>
+        /// Set state value
+        /// Note: This is a simplified implementation using in-memory cache.
+        /// For production use with NATS JetStream, upgrade to NATS.Net.Client.
+        /// </summary>
+        public void SetState(string key, Dictionary<string, object> value)
+        {
+            string json = JsonSerializer.Serialize(value);
+            if (_stateCache != null)
+            {
+                _stateCache[key] = json;
+            }
+
+            // Also publish state update for other clients
+            if (_nc != null)
+            {
+                var stateMsg = new Dictionary<string, object>
+                {
+                    { "key", key },
+                    { "value", value }
+                };
+                Publish("$LL.state.update", stateMsg);
+            }
+        }
+
+        /// <summary>
+        /// Get state value
+        /// Note: This is a simplified implementation using in-memory cache.
+        /// For production use with NATS JetStream, upgrade to NATS.Net.Client.
+        /// </summary>
+        public Dictionary<string, object> GetState(string key)
+        {
+            if (_stateCache != null && _stateCache.TryGetValue(key, out var json))
+            {
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                return result ?? new Dictionary<string, object>();
+            }
+            return new Dictionary<string, object>();
         }
 
         private void ConfigureTLS(Options opts)
