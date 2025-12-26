@@ -28,7 +28,7 @@ func main() {
 
 	// Create service with auto-discovered TLS
 	fmt.Println("\n[2/5] Creating service...")
-	svc, err := service.NewService("math-service", config.NATSURL, service.WithServiceClientAutoTLS())
+	svc, err := service.NewService("math-service-go", config.NATSURL, service.WithServiceClientAutoTLS())
 	if err != nil {
 		log.Fatalf("Failed to create service: %v", err)
 	}
@@ -193,7 +193,7 @@ func main() {
 	// Build and register service metadata
 	fmt.Println("\n[4/5] Registering service metadata...")
 	metadata := svc.BuildCurrentMetadata(
-		"math-service",
+		"math-service-go",
 		"v1.0.0",
 		"A mathematical operations service providing basic and advanced math functions",
 		"LiteHomeLab",
