@@ -105,6 +105,41 @@ namespace LightLink.Tests
             client.Close();
         }
 
+        [Fact]
+        public async Task Client_SetGetState_ShouldStoreAndRetrieve()
+        {
+            // Arrange
+            var client = new Client("nats://localhost:4222");
+            await client.ConnectAsync();
+
+            var key = "test.state";
+            var value = new Dictionary<string, object>
+            {
+                { "status", "active" },
+                { "count", 100 },
+                { "enabled", true }
+            };
+
+            // Act - Set state
+            client.SetState(key, value);
+            await Task.Delay(100); // Allow time for KV update
+
+            // Act - Get state
+            var retrieved = client.GetState(key);
+
+            // Assert
+            Assert.NotNull(retrieved);
+            Assert.True(retrieved.ContainsKey("status"));
+            Assert.Equal("active", retrieved["status"]);
+            Assert.True(retrieved.ContainsKey("count"));
+            Assert.Equal(100, retrieved["count"]);
+            Assert.True(retrieved.ContainsKey("enabled"));
+            Assert.True((bool)retrieved["enabled"]);
+
+            // Cleanup
+            client.Close();
+        }
+
         public void Dispose()
         {
             // Cleanup code
