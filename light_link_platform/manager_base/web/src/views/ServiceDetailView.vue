@@ -6,6 +6,10 @@
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
+        <el-button @click="showOpenAPI" type="primary" plain>
+          <el-icon><Document /></el-icon>
+          OpenAPI
+        </el-button>
       </template>
     </el-page-header>
 
@@ -216,13 +220,38 @@
         </el-collapse-item>
       </el-collapse>
     </el-card>
+
+    <!-- OpenAPI Dialog -->
+    <el-dialog
+      v-model="openapiDialogVisible"
+      title="OpenAPI Specification"
+      width="80%"
+      :close-on-click-modal="false"
+    >
+      <el-tabs v-model="activeFormat">
+        <el-tab-pane label="JSON" name="json">
+          <pre class="openapi-content">{{ openapiContent.json }}</pre>
+        </el-tab-pane>
+        <el-tab-pane label="YAML" name="yaml">
+          <pre class="openapi-content">{{ openapiContent.yaml }}</pre>
+        </el-tab-pane>
+      </el-tabs>
+
+      <template #footer>
+        <el-button @click="openapiDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="downloadOpenAPI">
+          <el-icon><Download /></el-icon>
+          下载
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Refresh, VideoPause, RefreshRight, Delete } from '@element-plus/icons-vue'
+import { Refresh, VideoPause, RefreshRight, Delete, Document, Download } from '@element-plus/icons-vue'
 import { servicesApi, type ServiceMetadata, type MethodMetadata, type ServiceStatus, type Instance } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useServicesStore, useInstancesStore, useUserStore } from '@/stores'
@@ -240,6 +269,11 @@ const serviceStatus = ref<ServiceStatus | null>(null)
 const loading = ref(false)
 const instancesLoading = ref(false)
 const activeInstances = ref<string[]>([])
+
+// OpenAPI dialog state
+const openapiDialogVisible = ref(false)
+const activeFormat = ref('json')
+const openapiContent = ref({ json: '', yaml: '' })
 
 // 当前服务的实例列表
 const serviceInstances = computed(() => {
@@ -271,6 +305,37 @@ function formatJSON(obj: any) {
 function formatReturnInfo(returnInfo: any[]): string {
   if (!returnInfo || !returnInfo.length) return 'void'
   return returnInfo.map(r => `${r.name || 'value'}: ${r.type}`).join(', ')
+}
+
+// OpenAPI functions
+async function showOpenAPI() {
+  try {
+    const [jsonResp, yamlResp] = await Promise.all([
+      servicesApi.getOpenAPI(serviceName.value, 'json'),
+      servicesApi.getOpenAPI(serviceName.value, 'yaml')
+    ])
+
+    openapiContent.value = {
+      json: typeof jsonResp === 'string' ? jsonResp : JSON.stringify(jsonResp, null, 2),
+      yaml: yamlResp
+    }
+
+    openapiDialogVisible.value = true
+  } catch (error: any) {
+    ElMessage.error('Failed to load OpenAPI spec')
+  }
+}
+
+function downloadOpenAPI() {
+  const content = activeFormat.value === 'json' ? openapiContent.value.json : openapiContent.value.yaml
+  const blob = new Blob([content], { type: activeFormat.value === 'json' ? 'application/json' : 'text/yaml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${serviceName.value}-openapi.${activeFormat.value}`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('Downloaded')
 }
 
 // 加载实例数据
@@ -551,5 +616,17 @@ onMounted(() => {
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
+}
+
+/* OpenAPI dialog styles */
+.openapi-content {
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+  max-height: 500px;
+  overflow: auto;
+  font-size: 12px;
+  margin: 0;
 }
 </style>
