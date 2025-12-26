@@ -1,0 +1,6 @@
+go 1.24.11
+
+use (
+	.
+	./light_link_platform/examples/caller/go/call-math-service-go
+)
