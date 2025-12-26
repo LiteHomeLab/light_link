@@ -14,6 +14,7 @@
 | **P2** | 备份功能示例 | Backup Agent 和 Client 示例 | `2024-12-26-p2-backup.md` |
 | **P2** | Notify (Go/Python) | Go/Python 发布订阅示例 | `2024-12-26-p2-notify-pubsub.md` |
 | **P2** | Python SDK 状态管理 | Python SDK KV 功能实现 | `2024-12-26-p2-python-sdk-state.md` |
+| **P3** | C++ SDK 和示例 | C++ SDK 完善 + Provider/Caller/PubSub 示例 | `2024-12-26-p3-cpp.md` |
 
 ## 优先级说明
 
@@ -29,6 +30,10 @@
 - 备份功能示例：SDK 已实现，需集成示例
 - Notify 示例：补充 Go/Python 的发布订阅示例
 - Python SDK 状态管理：补充 Python SDK 的 KV 功能
+
+### P3 - 低优先级（完善阶段）
+- C++ SDK 完善：补全头文件、Service 端实现
+- C++ 示例：Provider、Caller、PubSub 基础示例
 
 ## 执行顺序建议
 
@@ -46,6 +51,9 @@
   ├─ P2: Notify (Go/Python)
   ├─ P2: 备份功能示例
   └─ P2: Python SDK 状态管理
+
+第四阶段：完善（按需）
+  └─ P3: C++ SDK 和示例
 ```
 
 ## 计划详情
@@ -197,6 +205,26 @@
 
 ---
 
+### P3: C++ SDK 和示例
+
+**文件**: `2024-12-26-p3-cpp.md`
+
+**任务数量**: 7
+
+**主要内容**:
+- 完善 C++ SDK 头文件 (client.hpp, service.hpp, types.hpp)
+- 完成 Service 类实现
+- 创建 C++ Provider 示例 (math-service)
+- 创建 C++ Caller 示例
+- 创建 C++ PubSub 示例
+- 更新文档
+
+**预计时间**: 3-4 小时
+
+**依赖**: 无
+
+---
+
 ## 使用说明
 
 每个计划文件都包含：
@@ -222,7 +250,8 @@ cat docs/plans/2024-12-26-restore-csharp-client.md
 可以按优先级顺序依次执行：
 1. 先完成 P0
 2. 再完成所有 P1
-3. 最后完成 P2
+3. 然后完成 P2
+4. 最后按需完成 P3
 
 ---
 
