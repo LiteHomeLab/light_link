@@ -57,50 +57,55 @@ func (dc *DependencyChecker) queryExistingServices() error {
 		return fmt.Errorf("failed to create jetstream context: %w", err)
 	}
 
+	// Get or create KV bucket
+	kv, err := js.KeyValue(context.Background(), "light_link_state")
+	if err != nil {
+		// Try to create the bucket
+		kv, err = js.CreateKeyValue(context.Background(), jetstream.KeyValueConfig{
+			Bucket: "light_link_state",
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get or create KV store: %w", err)
+		}
+	}
+
+	// Get all keys matching service.*
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	kv, err := js.KeyValue(ctx, "light_link_state")
+	keys, err := kv.Keys(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get KV store: %w", err)
+		return fmt.Errorf("failed to list KV keys: %w", err)
 	}
 
-	// List all entries in the KV store
-	listener, err := kv.WatchAll(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create KV watcher: %w", err)
+	// Load metadata for each service key
+	for _, key := range keys {
+		if !strings.HasPrefix(key, "service.") {
+			continue
+		}
+
+		entry, err := kv.Get(ctx, key)
+		if err != nil {
+			dc.logger.Warnf("Failed to get KV entry %s: %v", key, err)
+			continue
+		}
+
+		if entry == nil || entry.Value() == nil {
+			continue
+		}
+
+		var metadata types.ServiceMetadata
+		if err := json.Unmarshal(entry.Value(), &metadata); err != nil {
+			dc.logger.Warnf("Failed to unmarshal metadata from KV: %v", err)
+			continue
+		}
+
+		dc.mu.Lock()
+		dc.registered[metadata.Name] = &metadata
+		dc.mu.Unlock()
 	}
 
-	// Collect all existing entries
-	seenKeys := make(map[string]bool)
-	for entry := range listener.Updates() {
-		if entry == nil {
-			break
-		}
-
-		key := entry.Key()
-		if seenKeys[key] {
-			// We've seen this key before and received an update, stop
-			break
-		}
-		seenKeys[key] = true
-
-		// Only process entries with keys starting with "service."
-		if strings.HasPrefix(key, "service.") {
-			var metadata types.ServiceMetadata
-			if err := json.Unmarshal(entry.Value(), &metadata); err != nil {
-				dc.logger.Warnf("Failed to unmarshal metadata from KV key %s: %v", key, err)
-				continue
-			}
-
-			dc.mu.Lock()
-			dc.registered[metadata.Name] = &metadata
-			dc.mu.Unlock()
-
-			dc.logger.Infof("Loaded existing service from KV: %s", metadata.Name)
-		}
-	}
-
+	dc.logger.Infof("Loaded %d services from KV store", len(dc.registered))
 	return nil
 }
 
