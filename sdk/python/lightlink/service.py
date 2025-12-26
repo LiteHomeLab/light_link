@@ -163,7 +163,7 @@ class Service:
         heartbeat = {
             "service": self.name,
             "version": "1.0.0",
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            "timestamp": int(datetime.utcnow().timestamp())
         }
         subject = f"$LL.heartbeat.{self.name}"
         await self.nc.publish(subject, json.dumps(heartbeat).encode())
@@ -195,7 +195,7 @@ class Service:
             "service": self.name,
             "version": metadata.version,
             "metadata": metadata.to_dict(),
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            "timestamp": int(datetime.utcnow().timestamp())
         }
 
         subject = f"$LL.register.{self.name}"

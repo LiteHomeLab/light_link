@@ -65,7 +65,7 @@ async def main():
 
         print("\n[2/5] Creating service with TLS...")
         svc = Service(
-            "math-service",
+            "math-service-python",
             "nats://172.18.200.47:4222",
             tls_config=ssl_ctx,
             auto_tls=False
