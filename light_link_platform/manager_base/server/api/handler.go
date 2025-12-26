@@ -8,7 +8,9 @@ import (
 
 	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/auth"
 	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/manager"
+	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/openapi"
 	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
+	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
 
 // Handler handles API requests
@@ -134,6 +136,12 @@ func (h *Handler) handleServiceRouter(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
 		sendJSONError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+
+	// Check if it's an OpenAPI request: /api/services/{service}/openapi
+	if len(parts) >= 5 && parts[4] == "openapi" {
+		h.handleOpenAPI(w, r, parts[3])
 		return
 	}
 
@@ -283,6 +291,79 @@ func (h *Handler) getMethodDetail(w http.ResponseWriter, r *http.Request, servic
 	}
 
 	sendJSON(w, method)
+}
+
+// handleOpenAPI handles OpenAPI spec requests
+func (h *Handler) handleOpenAPI(w http.ResponseWriter, r *http.Request, serviceName string) {
+	if r.Method != http.MethodGet {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Get service metadata
+	service, err := h.db.GetService(serviceName)
+	if err != nil {
+		sendJSONError(w, http.StatusNotFound, "Service not found")
+		return
+	}
+
+	// Get methods
+	methods, err := h.db.GetMethods(serviceName)
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to get methods")
+		return
+	}
+
+	// Convert to types.ServiceMetadata
+	metadata := convertToServiceMetadata(service, methods)
+
+	// Generate OpenAPI spec
+	spec := openapi.GenerateServiceOpenAPI(metadata)
+
+	// Check format (json or yaml)
+	format := r.URL.Query().Get("format")
+	if format == "yaml" {
+		w.Header().Set("Content-Type", "application/x-yaml")
+		yamlBytes, err := spec.ToYAML()
+		if err != nil {
+			sendJSONError(w, http.StatusInternalServerError, "Failed to generate YAML")
+			return
+		}
+		w.Write(yamlBytes)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		jsonBytes, err := spec.ToJSON()
+		if err != nil {
+			sendJSONError(w, http.StatusInternalServerError, "Failed to generate JSON")
+			return
+		}
+		w.Write(jsonBytes)
+	}
+}
+
+// convertToServiceMetadata converts storage types to SDK types
+func convertToServiceMetadata(service *storage.ServiceMetadata, methods []*storage.MethodMetadata) *types.ServiceMetadata {
+	sdkMethods := make([]types.MethodMetadata, len(methods))
+	for i, m := range methods {
+		sdkMethods[i] = types.MethodMetadata{
+			Name:        m.Name,
+			Description: m.Description,
+			Params:      m.Params,
+			Returns:     m.Returns,
+			Example:     m.Example,
+			Tags:        m.Tags,
+			Deprecated:  m.Deprecated,
+		}
+	}
+
+	return &types.ServiceMetadata{
+		Name:        service.Name,
+		Version:     service.Version,
+		Description: service.Description,
+		Author:      service.Author,
+		Tags:        service.Tags,
+		Methods:     sdkMethods,
+	}
 }
 
 // handleEvents handles event requests
