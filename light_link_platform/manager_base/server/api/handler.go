@@ -149,11 +149,6 @@ func (h *Handler) handleServiceRouter(w http.ResponseWriter, r *http.Request) {
 
 // handleServiceDetail handles service detail requests
 func (h *Handler) handleServiceDetail(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
 	// Extract service name from path
 	// /api/services/demo-service -> demo-service
 	parts := strings.Split(r.URL.Path, "/")
@@ -163,6 +158,18 @@ func (h *Handler) handleServiceDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	serviceName := parts[3]
 
+	switch r.Method {
+	case http.MethodGet:
+		h.handleGetService(w, r, serviceName)
+	case http.MethodDelete:
+		h.handleDeleteService(w, r, serviceName)
+	default:
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleGetService retrieves a single service
+func (h *Handler) handleGetService(w http.ResponseWriter, r *http.Request, serviceName string) {
 	service, err := h.db.GetService(serviceName)
 	if err != nil {
 		sendJSONError(w, http.StatusNotFound, "Service not found")
@@ -170,6 +177,29 @@ func (h *Handler) handleServiceDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, service)
+}
+
+// handleDeleteService deletes a service (only if offline)
+func (h *Handler) handleDeleteService(w http.ResponseWriter, r *http.Request, serviceName string) {
+	// Check if service is offline before allowing deletion
+	status, err := h.db.GetServiceStatus(serviceName)
+	if err != nil {
+		sendJSONError(w, http.StatusNotFound, "Service not found")
+		return
+	}
+
+	if status.Online {
+		sendJSONError(w, http.StatusForbidden, "Cannot delete online service")
+		return
+	}
+
+	// Delete service and all related data
+	if err := h.db.DeleteServiceCascade(serviceName); err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to delete service")
+		return
+	}
+
+	sendJSON(w, map[string]string{"message": "Service deleted successfully"})
 }
 
 // handleStatus handles status list requests

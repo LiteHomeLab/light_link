@@ -171,7 +171,8 @@ export const servicesApi = {
   get: (name: string) => api.get<ServiceMetadata>(`/services/${name}`) as unknown as Promise<ServiceMetadata>,
   getMethods: (name: string) => api.get<MethodMetadata[]>(`/services/${name}/methods`) as unknown as Promise<MethodMetadata[]>,
   getMethod: (service: string, method: string) =>
-    api.get<MethodMetadata>(`/services/${service}/methods/${method}`) as unknown as Promise<MethodMetadata>
+    api.get<MethodMetadata>(`/services/${service}/methods/${method}`) as unknown as Promise<MethodMetadata>,
+  delete: (name: string) => api.delete<{message: string}>(`/services/${name}`) as unknown as Promise<{message: string}>
 }
 
 // 状态相关

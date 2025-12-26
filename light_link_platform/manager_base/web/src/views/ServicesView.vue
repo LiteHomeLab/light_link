@@ -97,6 +97,15 @@
               <el-button size="small" @click.stop="viewService(service.name)">
                 查看详情
               </el-button>
+              <el-button
+                v-if="!status(service.name)?.online"
+                size="small"
+                type="danger"
+                @click.stop="handleDeleteService(service)"
+              >
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
             </div>
           </template>
         </el-card>
@@ -120,9 +129,12 @@ import {
   InfoFilled,
   User,
   PriceTag,
-  Calendar
+  Calendar,
+  Delete
 } from '@element-plus/icons-vue'
 import { useServicesStore, useInstancesStore } from '@/stores'
+import { servicesApi } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { storeToRefs } from 'pinia'
 
 const router = useRouter()
@@ -190,6 +202,27 @@ const formatDate = (dateStr: string) => {
 
 const viewService = (name: string) => {
   router.push(`/services/${name}`)
+}
+
+// 删除离线服务
+const handleDeleteService = async (service: { name: string }) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除离线服务 "${service.name}" 吗？此操作将同时删除该服务的所有实例、方法等相关数据，且不可恢复。`,
+      '确认删除',
+      {
+        type: 'error',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    await servicesApi.delete(service.name)
+    ElMessage.success('服务删除成功')
+    loadData()
+  } catch {
+    // 用户取消或删除失败
+  }
 }
 
 const loadData = () => {

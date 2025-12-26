@@ -3,6 +3,7 @@ import asyncio
 import json
 import uuid
 import ssl
+import time
 from typing import Dict, Callable, Any, Optional
 from datetime import datetime
 import logging
@@ -163,7 +164,7 @@ class Service:
         heartbeat = {
             "service": self.name,
             "version": "1.0.0",
-            "timestamp": int(datetime.utcnow().timestamp())
+            "timestamp": int(time.time())
         }
         subject = f"$LL.heartbeat.{self.name}"
         await self.nc.publish(subject, json.dumps(heartbeat).encode())
@@ -195,7 +196,7 @@ class Service:
             "service": self.name,
             "version": metadata.version,
             "metadata": metadata.to_dict(),
-            "timestamp": int(datetime.utcnow().timestamp())
+            "timestamp": int(time.time())
         }
 
         subject = f"$LL.register.{self.name}"

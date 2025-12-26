@@ -133,6 +133,17 @@ func (h *HeartbeatMonitor) checkTimeouts() {
 			// Update database status
 			h.db.UpdateServiceStatus(service, false, "")
 
+			// Update all instances of this service to offline
+			instances, err := h.db.GetInstancesByService(service)
+			if err == nil {
+				for _, inst := range instances {
+					if inst.Online {
+						h.db.UpdateInstanceOnline(inst.InstanceKey, false)
+						log.Printf("[Heartbeat] Instance offline: %s", inst.InstanceKey)
+					}
+				}
+			}
+
 			// Send offline event
 			h.eventCh <- &types.ServiceEvent{
 				Type:      "offline",

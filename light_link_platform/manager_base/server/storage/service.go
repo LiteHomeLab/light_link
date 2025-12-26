@@ -103,6 +103,50 @@ func (d *Database) DeleteService(name string) error {
 	return err
 }
 
+// DeleteServiceCascade deletes a service and all its related data (instances, methods, status)
+func (d *Database) DeleteServiceCascade(name string) error {
+	// Get service ID first
+	serviceID, err := d.GetServiceID(name)
+	if err != nil {
+		return fmt.Errorf("service not found: %s", name)
+	}
+
+	// Start a transaction for atomic deletion
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete from service_status_history
+	if _, err := tx.Exec("DELETE FROM service_status_history WHERE service_id = ?", serviceID); err != nil {
+		return err
+	}
+
+	// Delete from service_status
+	if _, err := tx.Exec("DELETE FROM service_status WHERE service_id = ?", serviceID); err != nil {
+		return err
+	}
+
+	// Delete instances for this service
+	if _, err := tx.Exec("DELETE FROM instances WHERE service_name = ?", name); err != nil {
+		return err
+	}
+
+	// Delete methods for this service
+	if _, err := tx.Exec("DELETE FROM methods WHERE service_id = ?", serviceID); err != nil {
+		return err
+	}
+
+	// Delete the service itself
+	if _, err := tx.Exec("DELETE FROM services WHERE id = ?", serviceID); err != nil {
+		return err
+	}
+
+	// Commit the transaction
+	return tx.Commit()
+}
+
 // GetServiceID returns the ID of a service by name
 func (d *Database) GetServiceID(name string) (int64, error) {
 	var id int64
