@@ -1089,3 +1089,51 @@ cp sdk/csharp/LightLink/Client.cs.bak sdk/csharp/LightLink/Client.cs
 
 - @superpowers:verification-before-completion - Run verification before final commit
 - @superpowers:test-driven-development - TDD methodology reference
+
+---
+
+## Acceptance Testing via Management Platform
+
+**IMPORTANT:** All development plans must be verified through the management platform.
+
+### Step 1: Start Management Platform Backend
+
+```bash
+cd light_link_platform/manager_base/server
+go run main.go
+```
+
+Wait for the backend server to start (default port: 8080).
+
+### Step 2: Start Management Platform Frontend
+
+```bash
+cd light_link_platform/manager_base/web
+npm run dev
+```
+
+Wait for the frontend development server to start.
+
+### Step 3: Open Browser and Verify
+
+1. Open browser to the frontend URL
+2. Navigate to the Services section
+3. Verify C# Client functionality:
+   - C# services using Client.cs can connect
+   - RPC calls appear in activity log
+   - PubSub messages are visible
+   - State changes are reflected in UI
+   - File transfers are tracked
+
+### Step 4: Test C# Client Integration
+
+1. Run a C# service example that uses the restored Client.cs
+2. Perform operations (RPC, PubSub, State, File Transfer)
+3. Verify in management platform:
+   - All operations succeed
+   - Proper TLS connection is established
+   - Service appears healthy
+
+### Step 5: Capture Evidence
+
+Take screenshots showing the C# Client successfully integrated with the platform through the management interface.

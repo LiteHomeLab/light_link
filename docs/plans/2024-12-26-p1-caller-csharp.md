@@ -558,3 +558,55 @@ This example requires:
 
 - P0: `2024-12-26-restore-csharp-client.md` (Must be completed first)
 - P1 Python: `2024-12-26-p1-caller-python.md`
+
+---
+
+## Acceptance Testing via Management Platform
+
+**IMPORTANT:** All development plans must be verified through the management platform.
+
+### Step 1: Start Management Platform Backend
+
+```bash
+cd light_link_platform/manager_base/server
+go run main.go
+```
+
+Wait for the backend server to start (default port: 8080).
+
+### Step 2: Start Management Platform Frontend
+
+```bash
+cd light_link_platform/manager_base/web
+npm run dev
+```
+
+Wait for the frontend development server to start (default port: 3000 or 5173).
+
+### Step 3: Open Browser and Verify
+
+1. Open browser to `http://localhost:3000` (or the port shown in frontend output)
+2. Navigate to the Services section
+3. Verify that:
+   - The C# Caller service appears in the service list
+   - The caller successfully connects to the NATS server
+   - RPC calls to provider services are displayed
+   - Dependencies are correctly checked before calling
+
+### Step 4: Test Full Flow
+
+1. Start a provider service (e.g., math-service-go)
+2. Start the C# Caller example
+3. Observe in the management platform:
+   - Service registration and heartbeat
+   - RPC call execution
+   - Response handling
+
+### Step 5: Capture Evidence
+
+Take screenshots of the management platform showing:
+- Service list with caller registered
+- Active RPC calls
+- Service dependencies status
+
+This acceptance testing ensures the implementation integrates correctly with the overall LightLink platform ecosystem.

@@ -603,3 +603,48 @@ All examples should:
 
 - P0: `2024-12-26-restore-csharp-client.md` (C# SDK Client required)
 - P2 Python SDK State: May include file transfer implementation
+
+---
+
+## Acceptance Testing via Management Platform
+
+**IMPORTANT:** All development plans must be verified through the management platform.
+
+### Step 1: Start Management Platform Backend
+
+```bash
+cd light_link_platform/manager_base/server
+go run main.go
+```
+
+Wait for the backend server to start.
+
+### Step 2: Start Management Platform Frontend
+
+```bash
+cd light_link_platform/manager_base/web
+npm run dev
+```
+
+Wait for the frontend to start.
+
+### Step 3: Open Browser and Verify
+
+1. Open browser to the frontend URL
+2. Navigate to the Files section
+3. Verify that:
+   - Uploaded files appear in the file list
+   - File metadata (size, type, timestamp) is displayed
+   - Download functionality works
+
+### Step 4: Test File Transfer Flow
+
+1. Run a file transfer example (Go/C#/Python)
+2. Observe in the management platform:
+   - File upload progress
+   - File appearing in Object Store
+   - Successful download verification
+
+### Step 5: Capture Evidence
+
+Take screenshots showing the complete file transfer workflow in the management platform.

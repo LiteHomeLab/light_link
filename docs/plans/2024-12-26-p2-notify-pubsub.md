@@ -680,3 +680,48 @@ python main.py
 - Python 3.8+
 - nats-py
 - LightLink Python SDK
+
+---
+
+## Acceptance Testing via Management Platform
+
+**IMPORTANT:** All development plans must be verified through the management platform.
+
+### Step 1: Start Management Platform Backend
+
+```bash
+cd light_link_platform/manager_base/server
+go run main.go
+```
+
+Wait for the backend server to start.
+
+### Step 2: Start Management Platform Frontend
+
+```bash
+cd light_link_platform/manager_base/web
+npm run dev
+```
+
+Wait for the frontend to start.
+
+### Step 3: Open Browser and Verify
+
+1. Open browser to the frontend URL
+2. Navigate to the Messages/PubSub section
+3. Verify that:
+   - Published messages appear in real-time
+   - Message subjects are organized
+   - Message content is displayed correctly
+
+### Step 4: Test PubSub Flow
+
+1. Run pubsub examples (Go and/or Python)
+2. Observe in the management platform:
+   - Messages being published
+   - Subscribers receiving messages
+   - Cross-language message exchange
+
+### Step 5: Capture Evidence
+
+Take screenshots showing message flow in the management platform.

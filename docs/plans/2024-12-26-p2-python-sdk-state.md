@@ -657,3 +657,49 @@ asyncio.run(test())
 ## Related Plans
 
 - P1 State KV Examples: `2024-12-26-p1-state-kv.md` (Uses this SDK implementation)
+
+---
+
+## Acceptance Testing via Management Platform
+
+**IMPORTANT:** All development plans must be verified through the management platform.
+
+### Step 1: Start Management Platform Backend
+
+```bash
+cd light_link_platform/manager_base/server
+go run main.go
+```
+
+Wait for the backend server to start.
+
+### Step 2: Start Management Platform Frontend
+
+```bash
+cd light_link_platform/manager_base/web
+npm run dev
+```
+
+Wait for the frontend to start.
+
+### Step 3: Open Browser and Verify
+
+1. Open browser to the frontend URL
+2. Navigate to the State/KV section
+3. Verify Python SDK state operations:
+   - `set_state()` creates entries visible in UI
+   - `get_state()` retrieves correct values
+   - `watch_state()` triggers UI updates
+
+### Step 4: Test Python SDK Integration
+
+1. Run Python state management example
+2. Perform state operations via example
+3. Verify in management platform:
+   - State changes appear immediately
+   - KV bucket `light_link_state` contains data
+   - Watch handlers receive updates
+
+### Step 5: Capture Evidence
+
+Take screenshots showing Python SDK state operations reflected in management platform.
