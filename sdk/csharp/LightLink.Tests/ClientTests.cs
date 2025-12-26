@@ -57,7 +57,7 @@ namespace LightLink.Tests
             // Assert
             Assert.NotNull(result);
             Assert.True(result.ContainsKey("result"));
-            Assert.Equal(30, (int)result["result"].GetInt32());
+            Assert.Equal(30, (int)result["result"]);
 
             // Cleanup
             client.Close();

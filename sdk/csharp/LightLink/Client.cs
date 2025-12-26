@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using NATS.Client;
+using System.Text.Json;
+using LightLink.Types;
 
 namespace LightLink
 {
@@ -72,6 +75,60 @@ namespace LightLink
         public void Dispose()
         {
             Close();
+        }
+
+        /// <summary>
+        /// RPC call (synchronous)
+        /// </summary>
+        /// <param name="service">Service name</param>
+        /// <param name="method">Method name</param>
+        /// <param name="args">Arguments dictionary</param>
+        /// <param name="timeoutMs">Timeout in milliseconds (default: 5000)</param>
+        /// <returns>Result dictionary</returns>
+        public Dictionary<string, object> Call(string service, string method,
+            Dictionary<string, object> args, int timeoutMs = 5000)
+        {
+            if (_nc == null)
+                throw new InvalidOperationException("Not connected. Call Connect() first.");
+
+            string subject = $"$SRV.{service}.{method}";
+
+            var request = new RPCRequest
+            {
+                Id = Guid.NewGuid().ToString(),
+                Method = method,
+                Args = args
+            };
+
+            string requestJson = JsonSerializer.Serialize(request);
+            byte[] requestData = System.Text.Encoding.UTF8.GetBytes(requestJson);
+
+            try
+            {
+                Msg msg = _nc.Request(subject, requestData, timeoutMs);
+                string responseJson = System.Text.Encoding.UTF8.GetString(msg.Data);
+
+                var response = JsonSerializer.Deserialize<RPCResponse>(responseJson);
+                if (response == null || !response.Success)
+                {
+                    throw new Exception(response?.Error ?? "RPC call failed");
+                }
+
+                return response.Result ?? new Dictionary<string, object>();
+            }
+            catch (NATS.Client.NATSTimeoutException)
+            {
+                throw new TimeoutException($"RPC call to {service}.{method} timed out");
+            }
+        }
+
+        /// <summary>
+        /// RPC call (asynchronous)
+        /// </summary>
+        public async System.Threading.Tasks.Task<Dictionary<string, object>> CallAsync(string service, string method,
+            Dictionary<string, object> args, int timeoutMs = 5000)
+        {
+            return await System.Threading.Tasks.Task.Run(() => Call(service, method, args, timeoutMs));
         }
 
         private void ConfigureTLS(Options opts)
