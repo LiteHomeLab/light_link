@@ -39,6 +39,30 @@ namespace LightLink.Tests
             client.Close();
         }
 
+        [Fact]
+        public async Task Client_Call_ShouldInvokeRemoteMethod()
+        {
+            // Arrange
+            var client = new Client("nats://localhost:4222");
+            await client.ConnectAsync();
+
+            // Act
+            var result = client.Call("math-service", "add",
+                new Dictionary<string, object>
+                {
+                    { "a", 10 },
+                    { "b", 20 }
+                });
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.True(result.ContainsKey("result"));
+            Assert.Equal(30, (int)result["result"].GetInt32());
+
+            // Cleanup
+            client.Close();
+        }
+
         public void Dispose()
         {
             // Cleanup code
