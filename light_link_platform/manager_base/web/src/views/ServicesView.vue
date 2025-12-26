@@ -234,6 +234,7 @@ const loadData = () => {
 // 生命周期
 onMounted(() => {
   servicesStore.init()
+  instancesStore.loadInstances()
 })
 </script>
 
