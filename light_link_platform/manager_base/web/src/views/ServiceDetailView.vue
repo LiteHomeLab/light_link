@@ -60,9 +60,21 @@
           </p>
 
           <div class="method-meta">
-            <el-tag size="small" type="info">
-              返回: {{ method.return_info?.type || 'void' }}
+            <el-tag size="small" type="info" v-if="method.return_info && method.return_info.length">
+              返回: {{ formatReturnInfo(method.return_info) }}
             </el-tag>
+            <el-tag size="small" type="info" v-else>
+              返回: void
+            </el-tag>
+          </div>
+
+          <div v-if="method.return_info && method.return_info.length" class="return-values">
+            <h5>返回值:</h5>
+            <el-table :data="method.return_info" size="small">
+              <el-table-column prop="name" label="名称" width="150" />
+              <el-table-column prop="type" label="类型" width="150" />
+              <el-table-column prop="description" label="描述" />
+            </el-table>
           </div>
 
           <div v-if="method.parameters && method.parameters.length" class="parameters">
@@ -256,6 +268,11 @@ function formatJSON(obj: any) {
   return JSON.stringify(obj, null, 2)
 }
 
+function formatReturnInfo(returnInfo: any[]): string {
+  if (!returnInfo || !returnInfo.length) return 'void'
+  return returnInfo.map(r => `${r.name || 'value'}: ${r.type}`).join(', ')
+}
+
 // 加载实例数据
 async function loadInstances() {
   instancesLoading.value = true
@@ -436,12 +453,14 @@ onMounted(() => {
 }
 
 .parameters,
-.examples {
+.examples,
+.return-values {
   margin-top: 12px;
 }
 
 .parameters h5,
-.examples h5 {
+.examples h5,
+.return-values h5 {
   margin: 0 0 8px 0;
   font-size: 14px;
   color: #333;
