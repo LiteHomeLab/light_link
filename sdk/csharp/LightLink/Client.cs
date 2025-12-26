@@ -131,6 +131,54 @@ namespace LightLink
             return await System.Threading.Tasks.Task.Run(() => Call(service, method, args, timeoutMs));
         }
 
+        /// <summary>
+        /// Publish message
+        /// </summary>
+        public void Publish(string subject, Dictionary<string, object> data)
+        {
+            if (_nc == null)
+                throw new InvalidOperationException("Not connected. Call Connect() first.");
+
+            string json = JsonSerializer.Serialize(data);
+            byte[] msgData = System.Text.Encoding.UTF8.GetBytes(json);
+            _nc.Publish(subject, msgData);
+        }
+
+        /// <summary>
+        /// Publish message asynchronously
+        /// </summary>
+        public async System.Threading.Tasks.Task PublishAsync(string subject, Dictionary<string, object> data)
+        {
+            await System.Threading.Tasks.Task.Run(() => Publish(subject, data));
+        }
+
+        /// <summary>
+        /// Subscribe to messages
+        /// </summary>
+        public ISubscription Subscribe(string subject, Action<Dictionary<string, object>> handler)
+        {
+            if (_nc == null)
+                throw new InvalidOperationException("Not connected. Call Connect() first.");
+
+            return _nc.SubscribeAsync(subject, (sender, args) =>
+            {
+                try
+                {
+                    var msg = args.Message;
+                    string json = System.Text.Encoding.UTF8.GetString(msg.Data);
+                    var data = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                    if (data != null)
+                    {
+                        handler(data);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Ignore JSON deserialization errors
+                }
+            });
+        }
+
         private void ConfigureTLS(Options opts)
         {
             if (_tlsConfig == null) return;
