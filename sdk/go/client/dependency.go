@@ -150,6 +150,11 @@ func (dc *DependencyChecker) handleRegisterMessage(msg *nats.Msg) {
 		return
 	}
 
+	if registerMsg.Service == "" {
+		dc.logger.Warn("Received register message with empty service name")
+		return
+	}
+
 	dc.mu.Lock()
 	dc.registered[registerMsg.Service] = &registerMsg.Metadata
 	dc.mu.Unlock()
@@ -225,6 +230,9 @@ func (dc *DependencyChecker) PrintProgress() {
 
 // printAllSatisfied prints all dependencies satisfied message
 func (dc *DependencyChecker) printAllSatisfied() {
+	dc.mu.RLock()
+	defer dc.mu.RUnlock()
+
 	logger.Info("=== All dependencies satisfied! ===")
 	logger.Info("")
 	logger.Info("Available services:")
@@ -252,9 +260,13 @@ func (dc *DependencyChecker) printAllSatisfied() {
 	}
 }
 
-// Close closes the dependency checker
+// Close closes the dependency checker and unsubscribes from NATS.
+// This method is safe to call multiple times.
 func (dc *DependencyChecker) Close() {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
 	if dc.sub != nil {
 		dc.sub.Unsubscribe()
+		dc.sub = nil
 	}
 }
