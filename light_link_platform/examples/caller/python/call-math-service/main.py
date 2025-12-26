@@ -12,10 +12,17 @@ import sys
 import os
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+# Navigate from light_link_platform/examples/caller/python/call-math-service to light_link/sdk/python
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+# Go up to project root, then to sdk/python
+_root = os.path.abspath(os.path.join(_current_dir, '../../../../..'))
+_sdk_path = os.path.join(_root, 'sdk', 'python')
+sys.path.insert(0, _sdk_path)
 
-from lightlink.client import Client, discover_client_certs
-from lightlink.types import CertDiscoveryResult
+# Import directly from modules
+import lightlink.client as client_module
+Client = client_module.Client
+discover_client_certs = client_module.discover_client_certs
 
 # Configure logging
 logging.basicConfig(
@@ -89,11 +96,11 @@ async def perform_calculations(client, service_name="math-service-go"):
     try:
         # First: multiply(3, 4)
         result1 = await client.call(service_name, "multiply", {"a": 3, "b": 4})
-        # Then: add(result, 10)
+        # Then: add(product, 10)
         result2 = await client.call(service_name, "add",
-                                   {"a": result1.get("result", 0), "b": 10})
-        logger.info(f"Complex: multiply(3, 4) = {result1.get('result')}, "
-                   f"then add({result1.get('result')}, 10) = {result2.get('result')}")
+                                   {"a": result1.get("product", 0), "b": 10})
+        logger.info(f"Complex: multiply(3, 4) = {result1.get('product')}, "
+                   f"then add({result1.get('product')}, 10) = {result2.get('sum')}")
     except Exception as e:
         logger.error(f"Complex calculation failed: {e}")
 
@@ -117,12 +124,10 @@ async def main():
         logger.error(f"Certificates not found: {e}")
         return
 
-    # Create client
+    # Create client with auto TLS
     logger.info("Connecting to NATS...")
-    client = Client(nats_url)
-    await client.connect(tls_cert_file=certs.cert_file,
-                        tls_key_file=certs.key_file,
-                        tls_ca_file=certs.ca_file)
+    client = Client(nats_url, auto_tls=True)
+    await client.connect()
     logger.info("Connected successfully")
 
     # Wait for math service
