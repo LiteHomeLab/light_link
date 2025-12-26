@@ -11,6 +11,7 @@ import (
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 	"github.com/WQGroup/logger"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,6 +48,60 @@ func NewDependencyChecker(nc *nats.Conn, deps []Dependency) *DependencyChecker {
 		registered: make(map[string]*types.ServiceMetadata),
 		logger:     logrus.New(),
 	}
+}
+
+// queryExistingServices queries existing service metadata from NATS KV store
+func (dc *DependencyChecker) queryExistingServices() error {
+	js, err := jetstream.New(dc.nc)
+	if err != nil {
+		return fmt.Errorf("failed to create jetstream context: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	kv, err := js.KeyValue(ctx, "light_link_state")
+	if err != nil {
+		return fmt.Errorf("failed to get KV store: %w", err)
+	}
+
+	// List all entries in the KV store
+	listener, err := kv.WatchAll(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create KV watcher: %w", err)
+	}
+
+	// Collect all existing entries
+	seenKeys := make(map[string]bool)
+	for entry := range listener.Updates() {
+		if entry == nil {
+			break
+		}
+
+		key := entry.Key()
+		if seenKeys[key] {
+			// We've seen this key before and received an update, stop
+			break
+		}
+		seenKeys[key] = true
+
+		// Only process entries with keys starting with "service."
+		if strings.HasPrefix(key, "service.") {
+			var metadata types.ServiceMetadata
+			if err := json.Unmarshal(entry.Value(), &metadata); err != nil {
+				dc.logger.Warnf("Failed to unmarshal metadata from KV key %s: %v", key, err)
+				continue
+			}
+
+			dc.mu.Lock()
+			dc.registered[metadata.Name] = &metadata
+			dc.mu.Unlock()
+
+			dc.logger.Infof("Loaded existing service from KV: %s", metadata.Name)
+		}
+	}
+
+	return nil
 }
 
 // GetCheckResults 获取当前检查结果
@@ -110,6 +165,12 @@ func (dc *DependencyChecker) allSatisfied() bool {
 
 // WaitForDependencies waits for all dependencies to be satisfied
 func (dc *DependencyChecker) WaitForDependencies(ctx context.Context) error {
+	// Query existing services from KV store first
+	if err := dc.queryExistingServices(); err != nil {
+		dc.logger.Warnf("Failed to query existing services: %v", err)
+		// Continue anyway - new services will be detected via subscription
+	}
+
 	// Subscribe to registration messages
 	sub, err := dc.nc.Subscribe("$LL.register.>", func(msg *nats.Msg) {
 		dc.handleRegisterMessage(msg)

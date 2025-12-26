@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/LiteHomeLab/light_link/light_link_platform/manager_base/server/storage"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // Registry handles service registration messages
@@ -61,7 +63,7 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 	// Check if this is an update
 	isUpdate := r.db.ServiceExists(register.Service)
 
-	// Save service metadata
+	// Save service metadata to local database
 	meta := &storage.ServiceMetadata{
 		Name:        register.Metadata.Name,
 		Version:     register.Metadata.Version,
@@ -122,6 +124,12 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 		log.Printf("[Registry] Failed to update status: %v", err)
 	}
 
+	// Store service metadata to NATS KV store for discovery
+	if err := r.storeMetadataToKV(&register.Metadata); err != nil {
+		log.Printf("[Registry] Failed to store metadata to KV: %v", err)
+		// Continue anyway - local database is the primary storage
+	}
+
 	// Send event
 	eventType := "registered"
 	if isUpdate {
@@ -133,6 +141,37 @@ func (r *Registry) handleRegister(msg *nats.Msg) {
 		Service:   register.Metadata.Name,
 		Timestamp: time.Unix(register.Timestamp, 0),
 	}
+}
+
+// storeMetadataToKV stores service metadata to NATS KV store for service discovery
+func (r *Registry) storeMetadataToKV(metadata *types.ServiceMetadata) error {
+	js, err := jetstream.New(r.nc)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	kv, err := js.KeyValue(ctx, "light_link_state")
+	if err != nil {
+		return err
+	}
+
+	// Store metadata with key "service.{service_name}"
+	key := "service." + metadata.Name
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+
+	_, err = kv.Put(ctx, key, data)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[Registry] Stored metadata to KV: %s", key)
+	return nil
 }
 
 // Events returns the event channel
