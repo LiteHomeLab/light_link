@@ -5,6 +5,7 @@ import (
     "fmt"
     "time"
 
+    "github.com/WQGroup/logger"
     "github.com/google/uuid"
     "github.com/LiteHomeLab/light_link/sdk/go/types"
 )
@@ -18,6 +19,9 @@ func (c *Client) Call(service, method string, args map[string]interface{}) (map[
 func (c *Client) CallWithTimeout(service, method string, args map[string]interface{}, timeout time.Duration) (map[string]interface{}, error) {
     // Generate request ID
     requestID := uuid.New().String()
+
+    // Debug logging
+    logger.Debugf("Calling %s.%s with args: %+v", service, method, args)
 
     // Build request
     request := types.RPCRequest{
@@ -47,8 +51,10 @@ func (c *Client) CallWithTimeout(service, method string, args map[string]interfa
     }
 
     if !response.Success {
+        logger.Errorf("RPC error: %s", response.Error)
         return nil, fmt.Errorf("RPC error: %s", response.Error)
     }
 
+    logger.Debugf("RPC response: %+v", response.Result)
     return response.Result, nil
 }

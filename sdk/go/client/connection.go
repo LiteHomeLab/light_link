@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/WQGroup/logger"
 	"github.com/nats-io/nats.go"
 	"github.com/LiteHomeLab/light_link/sdk/go/types"
 )
@@ -76,17 +77,20 @@ func NewClient(url string, opts ...Option) (*Client, error) {
 		}
 	}
 
+	// Initialize logger
+	logger.SetLoggerName("LightLink-Client")
+
 	natsOpts := []nats.Option{
 		nats.Name(client.name),
 		nats.ReconnectWait(2 * time.Second),
 		nats.MaxReconnects(10),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
 			if err != nil {
-				println("Disconnected:", err.Error())
+				logger.Errorf("Disconnected: %s", err.Error())
 			}
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			println("Reconnected to", nc.ConnectedUrl())
+			logger.Infof("Reconnected to %s", nc.ConnectedUrl())
 		}),
 	}
 
